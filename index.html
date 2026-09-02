@@ -658,17 +658,24 @@
 // ================== CONFIG ==================
 const SUPABASE_URL = 'https://vfhjbxoichiwadtmfntg.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_J_DMSRvrGPf477Zy8gAbqw_hKDLopMV';
-// ================== CONFIG ==================
-const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY';
 let supabaseClient = null, currentUser = null, dbMode = 'guest', charts = {};
 let currentSection = 'dashboard';
 const sectionOrder = ['dashboard','daily','bike','emi','todo','settings'];
 let deferredPrompt = null;
 
-// ================== INIT ==================
+// ================== SAFE SUPABASE CHECK ==================
+function isSupabaseConfigured() {
+    return SUPABASE_URL && !SUPABASE_URL.includes('YOUR-PROJECT') &&
+           SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR-ANON');
+}
+
+function isSupabaseLoaded() {
+    return typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function';
+}
+
+// ================== INIT (FIXED - NOW ASYNC) ==================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 App initializing...');
+    console.log('🚀 App starting...');
     setDefaultDates();
     updateDateDisplay();
     loadTheme();
@@ -677,60 +684,78 @@ document.addEventListener('DOMContentLoaded', async () => {
     registerServiceWorker();
     setupPWAInstall();
 
-    // Check Supabase configuration
-    if (!SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_ANON_KEY.includes('YOUR-ANON')) {
-        try { 
-            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            console.log('✅ Supabase client created');
-            await checkExistingSession();
-        } catch(e) { 
-            console.error('❌ Supabase init failed:', e);
+    // Set a safety timeout - if auth overlay is still showing after 5 seconds, force guest
+    const safetyTimeout = setTimeout(() => {
+        const overlay = document.getElementById('authOverlay');
+        if (overlay && overlay.style.display !== 'none') {
+            console.warn('⏰ Safety timeout - forcing guest mode');
             forceGuestMode();
         }
-    } else {
-        console.log('⚡ Running in Guest mode (Supabase not configured)');
+    }, 5000);
+
+    try {
+        if (isSupabaseConfigured()) {
+            if (isSupabaseLoaded()) {
+                console.log('✅ Supabase SDK loaded');
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                console.log('✅ Supabase client created');
+                await checkExistingSession();
+            } else {
+                console.warn('⚠️ Supabase SDK not loaded, using Guest mode');
+                forceGuestMode();
+            }
+        } else {
+            console.log('⚡ Supabase not configured, using Guest mode');
+            forceGuestMode();
+        }
+    } catch (e) {
+        console.error('❌ Init error:', e);
         forceGuestMode();
     }
+
+    clearTimeout(safetyTimeout);
 });
 
 function forceGuestMode() {
-    console.log('👤 Entering Guest mode');
-    document.getElementById('authOverlay').style.display = 'none';
-    dbMode = 'guest'; 
-    currentUser = null; 
-    updateSettingsUI(); 
+    console.log('👤 Forcing Guest mode');
+    const overlay = document.getElementById('authOverlay');
+    if (overlay) overlay.style.display = 'none';
+    dbMode = 'guest';
+    currentUser = null;
+    updateSettingsUI();
     refreshAllData();
 }
 
 function setDefaultDates() {
     const t = new Date().toISOString().split('T')[0];
-    ['expDate','bikeDate'].forEach(id => { 
-        const el = document.getElementById(id); 
-        if(el) el.value = t; 
+    ['expDate','bikeDate'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = t;
     });
-    const m = document.getElementById('reportMonth'); 
-    if(m) m.value = new Date().toISOString().slice(0,7);
+    const m = document.getElementById('reportMonth');
+    if (m) m.value = new Date().toISOString().slice(0, 7);
 }
 
 function updateDateDisplay() {
-    document.getElementById('dateDisplay').textContent = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const el = document.getElementById('dateDisplay');
+    if (el) el.textContent = new Date().toLocaleDateString('en-US', {month:'short', day:'numeric'});
 }
 
-function showToast(msg, type='success') {
-    document.querySelectorAll('.toast').forEach(t=>t.remove());
-    const t = document.createElement('div'); 
-    t.className='toast '+type; 
-    t.textContent=msg;
-    document.body.appendChild(t); 
-    setTimeout(()=>t.remove(),2500);
+function showToast(msg, type = 'success') {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const t = document.createElement('div');
+    t.className = 'toast ' + type;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2500);
 }
 
 // ================== PWA ==================
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('✅ SW registered:', reg.scope))
-            .catch(err => console.log('⚠️ SW registration failed:', err));
+            .then(reg => console.log('✅ SW registered'))
+            .catch(err => console.log('⚠️ SW failed:', err));
     }
 }
 
@@ -740,50 +765,37 @@ function setupPWAInstall() {
         deferredPrompt = e;
         const banner = document.getElementById('installBanner');
         const settingsItem = document.getElementById('installSettingsItem');
-        if (!localStorage.getItem('install_dismissed')) {
-            banner.classList.add('show');
-        }
+        if (banner && !localStorage.getItem('install_dismissed')) banner.classList.add('show');
         if (settingsItem) settingsItem.style.display = 'flex';
     });
-
     window.addEventListener('appinstalled', () => {
         deferredPrompt = null;
-        document.getElementById('installBanner').classList.remove('show');
-        const settingsItem = document.getElementById('installSettingsItem');
-        if (settingsItem) settingsItem.style.display = 'none';
-        showToast('App installed successfully! 🎉');
+        const banner = document.getElementById('installBanner');
+        if (banner) banner.classList.remove('show');
+        showToast('App installed! 🎉');
     });
-
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-        const settingsItem = document.getElementById('installSettingsItem');
-        if (settingsItem) settingsItem.style.display = 'none';
-    }
 }
 
 function doInstall() {
     if (deferredPrompt) {
         deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choice) => {
-            if (choice.outcome === 'accepted') {
-                showToast('Installing...');
-            }
-            deferredPrompt = null;
-            document.getElementById('installBanner').classList.remove('show');
-        });
+        deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+        const banner = document.getElementById('installBanner');
+        if (banner) banner.classList.remove('show');
     } else {
-        showToast('Open in browser menu to install', 'error');
+        showToast('Use browser menu to install', 'error');
     }
 }
 
 function dismissInstall() {
-    document.getElementById('installBanner').classList.remove('show');
+    const banner = document.getElementById('installBanner');
+    if (banner) banner.classList.remove('show');
     localStorage.setItem('install_dismissed', 'true');
 }
 
-// ================== SWIPE GESTURE ==================
+// ================== SWIPE ==================
 function setupSwipe() {
     let startX = 0, startY = 0, tracking = false, isHorizontal = null;
-
     document.addEventListener('touchstart', e => {
         const tag = e.target.tagName.toLowerCase();
         if (['input','select','textarea','button'].includes(tag)) return;
@@ -792,7 +804,6 @@ function setupSwipe() {
         tracking = true;
         isHorizontal = null;
     }, {passive: true});
-
     document.addEventListener('touchmove', e => {
         if (!tracking) return;
         const dx = e.touches[0].clientX - startX;
@@ -801,63 +812,28 @@ function setupSwipe() {
             isHorizontal = Math.abs(dx) > Math.abs(dy);
         }
     }, {passive: true});
-
     document.addEventListener('touchend', e => {
         if (!tracking) return;
         tracking = false;
         if (!isHorizontal) return;
-
-        const endX = e.changedTouches[0].clientX;
-        const dx = endX - startX;
-        const threshold = 80;
-
-        if (Math.abs(dx) > threshold) {
+        const dx = e.changedTouches[0].clientX - startX;
+        if (Math.abs(dx) > 80) {
             const idx = sectionOrder.indexOf(currentSection);
-            if (dx > 0 && idx > 0) {
-                showSection(sectionOrder[idx - 1]);
-                showSwipeHint('➡️ ' + getSectionTitle(sectionOrder[idx - 1]));
-            } else if (dx < 0 && idx < sectionOrder.length - 1) {
-                showSection(sectionOrder[idx + 1]);
-                showSwipeHint('⬅️ ' + getSectionTitle(sectionOrder[idx + 1]));
-            }
+            if (dx > 0 && idx > 0) { showSection(sectionOrder[idx-1]); showSwipeHint('➡️ '+getSectionTitle(sectionOrder[idx-1])); }
+            else if (dx < 0 && idx < sectionOrder.length-1) { showSection(sectionOrder[idx+1]); showSwipeHint('⬅️ '+getSectionTitle(sectionOrder[idx+1])); }
         }
     }, {passive: true});
 }
+function getSectionTitle(n) { return {dashboard:'Home',daily:'Daily',bike:'Bike',emi:'EMI',todo:'To-Do',settings:'Settings'}[n]||n; }
+function showSwipeHint(t) { const el=document.getElementById('swipeIndicator'); if(!el)return; el.textContent=t; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),800); }
 
-function getSectionTitle(name) {
-    const t = {dashboard:'Home',daily:'Daily',bike:'Bike',emi:'EMI',todo:'To-Do',settings:'Settings'};
-    return t[name] || name;
-}
-
-function showSwipeHint(text) {
-    const el = document.getElementById('swipeIndicator');
-    el.textContent = text; 
-    el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 800);
-}
-
-// ================== EXIT CONFIRM ==================
+// ================== EXIT ==================
 function setupExitConfirm() {
-    history.pushState(null, '', location.href);
-    window.addEventListener('popstate', () => {
-        history.pushState(null, '', location.href);
-        document.getElementById('confirmExit').classList.add('show');
-    });
-    window.addEventListener('beforeunload', e => {
-        e.preventDefault();
-        e.returnValue = '';
-    });
+    history.pushState(null,'',location.href);
+    window.addEventListener('popstate', () => { history.pushState(null,'',location.href); document.getElementById('confirmExit').classList.add('show'); });
 }
-
-function cancelExit() {
-    document.getElementById('confirmExit').classList.remove('show');
-}
-
-function confirmExitApp() {
-    document.getElementById('confirmExit').classList.remove('show');
-    window.close();
-    showToast('Close this tab manually', 'error');
-}
+function cancelExit() { document.getElementById('confirmExit').classList.remove('show'); }
+function confirmExitApp() { document.getElementById('confirmExit').classList.remove('show'); window.close(); }
 
 // ================== NAVIGATION ==================
 function showSection(name) {
@@ -865,18 +841,15 @@ function showSection(name) {
     document.querySelectorAll('.nav-item-bottom').forEach(el => el.classList.remove('active'));
     const nav = document.querySelector(`.nav-item-bottom[data-section="${name}"]`);
     if (nav) nav.classList.add('active');
-
     document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
     const sec = document.getElementById('section-' + name);
     if (sec) sec.classList.add('active');
-
     const titles = {dashboard:'Dashboard',daily:'Daily Expenses',bike:'Bike Tracker',emi:'EMI Tracker',todo:'To-Do List',settings:'Settings','reports-temp':'Reports'};
     document.getElementById('pageTitle').textContent = titles[name] || 'Dashboard';
-
     if (name === 'settings') updateSettingsUI();
     if (name === 'reports-temp') renderReportChart();
     refreshAllData();
-    window.scrollTo({top: 0, behavior: 'smooth'});
+    window.scrollTo({top:0,behavior:'smooth'});
 }
 
 // ================== THEME ==================
@@ -884,95 +857,73 @@ function setTheme(mode) {
     document.querySelectorAll('.theme-opt').forEach(el => el.classList.remove('active'));
     const opt = document.querySelector(`.theme-opt[data-theme-val="${mode}"]`);
     if (opt) opt.classList.add('active');
-
     if (mode === 'system') {
-        const prefersDark = window.matchMedia('(prefers-color-scheme:dark)').matches;
-        document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', window.matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
     } else {
         document.documentElement.setAttribute('data-theme', mode);
     }
     localStorage.setItem('theme', mode);
 }
-
-function loadTheme() {
-    const saved = localStorage.getItem('theme') || 'light';
-    setTheme(saved);
-}
+function loadTheme() { setTheme(localStorage.getItem('theme') || 'light'); }
 
 // ================== AUTH (FIXED) ==================
 async function checkExistingSession() {
-    if (!supabaseClient) {
-        console.log('⚠️ No Supabase client, entering Guest mode');
-        forceGuestMode();
-        return;
-    }
-    
+    if (!supabaseClient) { forceGuestMode(); return; }
     try {
-        console.log('🔍 Checking existing session...');
-        const {data:{session}, error} = await supabaseClient.auth.getSession();
-        
-        if (error) {
-            console.error('❌ Session check error:', error);
-            forceGuestMode();
-            return;
-        }
-        
+        const {data:{session}} = await supabaseClient.auth.getSession();
         if (session?.user) {
-            console.log('✅ User logged in:', session.user.email);
-            currentUser = session.user; 
+            currentUser = session.user;
             dbMode = 'cloud';
             document.getElementById('authOverlay').style.display = 'none';
-            updateSettingsUI(); 
-            showToast('Welcome back!'); 
-            await refreshAllData();
+            updateSettingsUI();
+            showToast('Welcome back!');
+            refreshAllData();
         } else {
-            console.log('⚡ No active session, entering Guest mode');
             forceGuestMode();
         }
-    } catch(e) { 
-        console.error('❌ Session check failed:', e);
+    } catch (e) {
+        console.error('Session error:', e);
         forceGuestMode();
     }
 }
 
 function continueAsGuest() {
-    console.log('👤 Continuing as Guest');
-    document.getElementById('authOverlay').style.display = 'none';
-    dbMode = 'guest'; 
-    currentUser = null; 
-    updateSettingsUI(); 
-    refreshAllData(); 
+    console.log('👤 Guest button clicked');
+    forceGuestMode();
     showToast('Guest mode activated');
 }
 
 async function loginWithGoogle() {
-    if (!supabaseClient) { 
-        showToast('Configure Supabase first','error'); 
-        return; 
+    if (!isSupabaseConfigured()) {
+        showToast('Supabase not configured. Use Guest mode.', 'error');
+        return;
+    }
+    if (!supabaseClient) {
+        showToast('Supabase client not ready. Use Guest mode.', 'error');
+        return;
     }
     try {
         const {error} = await supabaseClient.auth.signInWithOAuth({
-            provider:'google',
-            options:{redirectTo:window.location.origin}
+            provider: 'google',
+            options: {redirectTo: window.location.origin}
         });
         if (error) throw error;
-    } catch(e) { 
-        console.error('❌ Login failed:', e);
-        showToast('Login failed: '+e.message,'error'); 
+    } catch (e) {
+        console.error('Login error:', e);
+        showToast('Login failed: ' + e.message, 'error');
     }
 }
 
 async function handleLogout() {
-    if (dbMode === 'guest') { 
-        showToast('Already in guest mode','error'); 
-        return; 
+    if (dbMode === 'guest') { showToast('Already guest mode', 'error'); return; }
+    if (supabaseClient) {
+        try { await supabaseClient.auth.signOut(); } catch(e) { console.error(e); }
     }
-    if (supabaseClient) await supabaseClient.auth.signOut();
-    currentUser = null; 
-    dbMode = 'guest'; 
-    updateSettingsUI(); 
-    showToast('Logged out'); 
-    await refreshAllData();
+    currentUser = null;
+    dbMode = 'guest';
+    updateSettingsUI();
+    showToast('Logged out');
+    refreshAllData();
 }
 
 function updateSettingsUI() {
@@ -981,6 +932,7 @@ function updateSettingsUI() {
     const email = document.getElementById('settingsUserEmail');
     const status = document.getElementById('settingsStatus');
     const authBtns = document.getElementById('authButtons');
+    if (!avatar || !name || !email || !status || !authBtns) return;
 
     if (currentUser) {
         avatar.textContent = (currentUser.email?.[0] || 'U').toUpperCase();
@@ -988,919 +940,303 @@ function updateSettingsUI() {
         email.textContent = currentUser.email || '';
         status.className = 'status-badge online';
         status.innerHTML = '☁️ Synced';
-        authBtns.innerHTML = `<button class="btn btn-danger" onclick="handleLogout()">🚪 Logout</button>`;
+        authBtns.innerHTML = '<button class="btn btn-danger" onclick="handleLogout()">🚪 Logout</button>';
     } else {
         avatar.textContent = 'G';
         name.textContent = 'Guest User';
         email.textContent = 'Data stored locally only';
         status.className = 'status-badge offline';
         status.innerHTML = '⚡ Guest';
-        authBtns.innerHTML = `<button class="btn btn-primary" onclick="loginWithGoogle()" style="margin-bottom:8px;">Sign in with Google</button>`;
+        authBtns.innerHTML = '<button class="btn btn-primary" onclick="loginWithGoogle()" style="margin-bottom:8px;">Sign in with Google</button>';
     }
 }
 
 // ================== DATA LAYER ==================
-function getLocal(key) { 
-    try { 
-        return JSON.parse(localStorage.getItem(key)) || []; 
-    } catch { 
-        return []; 
-    } 
-}
-
-function setLocal(key, data) { 
-    localStorage.setItem(key, JSON.stringify(data)); 
-}
-
-function uid() { 
-    return Date.now().toString(36) + Math.random().toString(36).slice(2,8); 
-}
+function getLocal(key) { try { return JSON.parse(localStorage.getItem(key)) || []; } catch { return []; } }
+function setLocal(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
 async function getExpenses() {
     if (dbMode==='cloud' && supabaseClient && currentUser) {
-        try {
-            const {data, error} = await supabaseClient.from('expenses').select('*').eq('user_id',currentUser.id).order('date',{ascending:false});
-            if (error) throw error;
-            return data || [];
-        } catch(e) {
-            console.error('Error loading expenses:', e);
-            return [];
-        }
+        try { const {data} = await supabaseClient.from('expenses').select('*').eq('user_id',currentUser.id).order('date',{ascending:false}); return data||[]; } catch(e) { return []; }
     }
     return getLocal('guest_expenses');
 }
-
 async function saveExpense(obj) {
     if (dbMode==='cloud' && supabaseClient && currentUser) {
-        obj.user_id=currentUser.id; 
-        obj.created_at=new Date().toISOString();
-        const {error} = await supabaseClient.from('expenses').insert(obj);
-        if (error) throw error;
+        obj.user_id=currentUser.id; obj.created_at=new Date().toISOString();
+        await supabaseClient.from('expenses').insert(obj);
     } else {
-        const l=getLocal('guest_expenses'); 
-        obj.id=uid(); 
-        obj.created_at=new Date().toISOString(); 
-        l.unshift(obj); 
-        setLocal('guest_expenses',l);
+        const l=getLocal('guest_expenses'); obj.id=uid(); obj.created_at=new Date().toISOString(); l.unshift(obj); setLocal('guest_expenses',l);
     }
 }
-
 async function deleteExpense(id) {
     if(!confirm('Delete?')) return;
-    try {
-        if(dbMode==='cloud'&&supabaseClient&&currentUser) {
-            await supabaseClient.from('expenses').delete().eq('id',id).eq('user_id',currentUser.id);
-        } else {
-            setLocal('guest_expenses',getLocal('guest_expenses').filter(e=>e.id!==id));
-        }
-        await refreshAllData(); 
-        showToast('Deleted');
-    } catch(e) {
-        console.error('Error deleting expense:', e);
-        showToast('Failed to delete','error');
-    }
+    if(dbMode==='cloud'&&supabaseClient&&currentUser) await supabaseClient.from('expenses').delete().eq('id',id).eq('user_id',currentUser.id);
+    else setLocal('guest_expenses',getLocal('guest_expenses').filter(e=>e.id!==id));
+    refreshAllData(); showToast('Deleted');
 }
-
 async function getBike() {
-    if(dbMode==='cloud'&&supabaseClient&&currentUser) {
-        try {
-            const {data, error} = await supabaseClient.from('bike_records').select('*').eq('user_id',currentUser.id).order('date',{ascending:false});
-            if (error) throw error;
-            return data||[];
-        } catch(e) {
-            console.error('Error loading bike records:', e);
-            return [];
-        }
-    }
+    if(dbMode==='cloud'&&supabaseClient&&currentUser) { try { const {data}=await supabaseClient.from('bike_records').select('*').eq('user_id',currentUser.id).order('date',{ascending:false}); return data||[]; } catch(e) { return []; } }
     return getLocal('guest_bike_records');
 }
-
 async function saveBike(obj) {
-    if(dbMode==='cloud'&&supabaseClient&&currentUser) {
-        obj.user_id=currentUser.id; 
-        obj.created_at=new Date().toISOString();
-        const {error} = await supabaseClient.from('bike_records').insert(obj);
-        if (error) throw error;
-    } else {
-        const l=getLocal('guest_bike_records'); 
-        obj.id=uid(); 
-        obj.created_at=new Date().toISOString(); 
-        l.unshift(obj); 
-        setLocal('guest_bike_records',l);
-    }
+    if(dbMode==='cloud'&&supabaseClient&&currentUser) { obj.user_id=currentUser.id; obj.created_at=new Date().toISOString(); await supabaseClient.from('bike_records').insert(obj); }
+    else { const l=getLocal('guest_bike_records'); obj.id=uid(); obj.created_at=new Date().toISOString(); l.unshift(obj); setLocal('guest_bike_records',l); }
 }
-
 async function deleteBike(id) {
     if(!confirm('Delete?')) return;
-    try {
-        if(dbMode==='cloud'&&supabaseClient&&currentUser) {
-            await supabaseClient.from('bike_records').delete().eq('id',id).eq('user_id',currentUser.id);
-        } else {
-            setLocal('guest_bike_records',getLocal('guest_bike_records').filter(r=>r.id!==id));
-        }
-        await refreshAllData(); 
-        showToast('Deleted');
-    } catch(e) {
-        console.error('Error deleting bike record:', e);
-        showToast('Failed to delete','error');
-    }
+    if(dbMode==='cloud'&&supabaseClient&&currentUser) await supabaseClient.from('bike_records').delete().eq('id',id).eq('user_id',currentUser.id);
+    else setLocal('guest_bike_records',getLocal('guest_bike_records').filter(r=>r.id!==id));
+    refreshAllData(); showToast('Deleted');
 }
-
 async function getEmis() {
-    if(dbMode==='cloud'&&supabaseClient&&currentUser) {
-        try {
-            const {data, error} = await supabaseClient.from('emi_plans').select('*').eq('user_id',currentUser.id).order('created_at',{ascending:false});
-            if (error) throw error;
-            return data||[];
-        } catch(e) {
-            console.error('Error loading EMI plans:', e);
-            return [];
-        }
-    }
+    if(dbMode==='cloud'&&supabaseClient&&currentUser) { try { const {data}=await supabaseClient.from('emi_plans').select('*').eq('user_id',currentUser.id).order('created_at',{ascending:false}); return data||[]; } catch(e) { return []; } }
     return getLocal('guest_emi_plans');
 }
-
 async function saveEmi(obj) {
-    if(dbMode==='cloud'&&supabaseClient&&currentUser) {
-        obj.user_id=currentUser.id; 
-        obj.created_at=new Date().toISOString();
-        const {error} = await supabaseClient.from('emi_plans').insert(obj);
-        if (error) throw error;
-    } else {
-        const l=getLocal('guest_emi_plans'); 
-        obj.id=uid(); 
-        obj.created_at=new Date().toISOString(); 
-        l.unshift(obj); 
-        setLocal('guest_emi_plans',l);
-    }
+    if(dbMode==='cloud'&&supabaseClient&&currentUser) { obj.user_id=currentUser.id; obj.created_at=new Date().toISOString(); await supabaseClient.from('emi_plans').insert(obj); }
+    else { const l=getLocal('guest_emi_plans'); obj.id=uid(); obj.created_at=new Date().toISOString(); l.unshift(obj); setLocal('guest_emi_plans',l); }
 }
-
 async function deleteEmi(id) {
     if(!confirm('Delete?')) return;
-    try {
-        if(dbMode==='cloud'&&supabaseClient&&currentUser) {
-            await supabaseClient.from('emi_plans').delete().eq('id',id).eq('user_id',currentUser.id);
-        } else {
-            setLocal('guest_emi_plans',getLocal('guest_emi_plans').filter(p=>p.id!==id));
-        }
-        await refreshAllData(); 
-        showToast('Deleted');
-    } catch(e) {
-        console.error('Error deleting EMI plan:', e);
-        showToast('Failed to delete','error');
-    }
+    if(dbMode==='cloud'&&supabaseClient&&currentUser) await supabaseClient.from('emi_plans').delete().eq('id',id).eq('user_id',currentUser.id);
+    else setLocal('guest_emi_plans',getLocal('guest_emi_plans').filter(p=>p.id!==id));
+    refreshAllData(); showToast('Deleted');
 }
-
 async function markEmiPaid(id) {
-    try {
-        const plans=await getEmis(); 
-        const p=plans.find(x=>x.id===id);
-        if(!p||(p.paid_months||0)>=p.num_months){
-            showToast('Fully paid','error');
-            return;
-        }
-        const n=(p.paid_months||0)+1;
-        if(dbMode==='cloud'&&supabaseClient&&currentUser) {
-            await supabaseClient.from('emi_plans').update({paid_months:n}).eq('id',id).eq('user_id',currentUser.id);
-        } else { 
-            const l=getLocal('guest_emi_plans'); 
-            const i=l.findIndex(x=>x.id===id); 
-            if(i>-1){
-                l[i].paid_months=n;
-                setLocal('guest_emi_plans',l);
-            } 
-        }
-        showToast('Paid!'); 
-        await refreshAllData();
-    } catch(e) {
-        console.error('Error marking EMI paid:', e);
-        showToast('Failed to update','error');
-    }
+    const plans=await getEmis(); const p=plans.find(x=>x.id===id);
+    if(!p||(p.paid_months||0)>=p.num_months){showToast('Fully paid','error');return;}
+    const n=(p.paid_months||0)+1;
+    if(dbMode==='cloud'&&supabaseClient&&currentUser) await supabaseClient.from('emi_plans').update({paid_months:n}).eq('id',id).eq('user_id',currentUser.id);
+    else { const l=getLocal('guest_emi_plans'); const i=l.findIndex(x=>x.id===id); if(i>-1){l[i].paid_months=n;setLocal('guest_emi_plans',l);} }
+    showToast('Paid!'); refreshAllData();
 }
 
-// ================== TODOS (COMPLETELY FIXED) ==================
+// ================== TODOS (FIXED) ==================
 async function getTodos() {
-    console.log('📋 Loading todos, dbMode:', dbMode);
-    
-    if(dbMode==='cloud' && supabaseClient && currentUser) {
-        try {
-            console.log('☁️ Fetching todos from cloud...');
-            const {data, error} = await supabaseClient.from('todos')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .order('created_at', {ascending: false});
-            
-            if (error) {
-                console.error('❌ Cloud todos error:', error);
-                return [];
-            }
-            
-            console.log('✅ Loaded', data?.length || 0, 'todos from cloud');
-            return data || [];
-        } catch(e) {
-            console.error('❌ Error loading cloud todos:', e);
-            return [];
-        }
+    if(dbMode==='cloud'&&supabaseClient&&currentUser) {
+        try { const {data,error}=await supabaseClient.from('todos').select('*').eq('user_id',currentUser.id).order('created_at',{ascending:false}); if(error) throw error; return data||[]; } catch(e) { console.error('Todos error:',e); return []; }
     }
-    
-    const localTodos = getLocal('guest_todos');
-    console.log('💾 Loaded', localTodos.length, 'todos from localStorage');
-    return localTodos;
+    return getLocal('guest_todos');
 }
-
 async function addTodo() {
-    const input = document.getElementById('todoInput');
-    if (!input) {
-        console.error('❌ todoInput not found');
-        return;
-    }
-    
-    const text = input.value.trim();
-    if(!text) {
-        showToast('Enter a task','error');
-        return;
-    }
-    
+    const input=document.getElementById('todoInput'); if(!input) return;
+    const text=input.value.trim(); if(!text){showToast('Enter a task','error');return;}
     try {
-        console.log('➕ Adding todo:', text);
-        const todoObj = {
-            text, 
-            done: false, 
-            created_at: new Date().toISOString()
-        };
-        
-        if(dbMode==='cloud' && supabaseClient && currentUser) {
-            todoObj.user_id = currentUser.id;
-            const {data, error} = await supabaseClient.from('todos').insert(todoObj).select().single();
-            if (error) throw error;
-            console.log('✅ Todo saved to cloud');
-        } else {
-            const l = getLocal('guest_todos');
-            todoObj.id = uid();
-            l.unshift(todoObj);
-            setLocal('guest_todos', l);
-            console.log('✅ Todo saved to localStorage');
-        }
-        
-        input.value = '';
-        showToast('✅ Task added');
-        await refreshAllData();
-    } catch(e) {
-        console.error('❌ Error adding todo:', e);
-        showToast('Failed to add task: ' + e.message,'error');
-    }
+        const obj={text,done:false,created_at:new Date().toISOString()};
+        if(dbMode==='cloud'&&supabaseClient&&currentUser) { obj.user_id=currentUser.id; const {error}=await supabaseClient.from('todos').insert(obj).select().single(); if(error) throw error; }
+        else { const l=getLocal('guest_todos'); obj.id=uid(); l.unshift(obj); setLocal('guest_todos',l); }
+        input.value=''; showToast('Task added'); await refreshAllData();
+    } catch(e) { console.error(e); showToast('Failed: '+e.message,'error'); }
 }
-
 async function addDashTodo() {
-    const input = document.getElementById('dashTodoInput');
-    if (!input) {
-        console.error('❌ dashTodoInput not found');
-        return;
-    }
-    
-    const text = input.value.trim();
-    if(!text) return;
-    
+    const input=document.getElementById('dashTodoInput'); if(!input) return;
+    const text=input.value.trim(); if(!text) return;
     try {
-        console.log('➕ Adding dashboard todo:', text);
-        const todoObj = {
-            text, 
-            done: false, 
-            created_at: new Date().toISOString()
-        };
-        
-        if(dbMode==='cloud' && supabaseClient && currentUser) {
-            todoObj.user_id = currentUser.id;
-            const {data, error} = await supabaseClient.from('todos').insert(todoObj).select().single();
-            if (error) throw error;
-        } else {
-            const l = getLocal('guest_todos');
-            todoObj.id = uid();
-            l.unshift(todoObj);
-            setLocal('guest_todos', l);
-        }
-        
-        input.value = '';
-        showToast('✅ Task added');
-        await refreshAllData();
-    } catch(e) {
-        console.error('❌ Error adding dashboard todo:', e);
-        showToast('Failed to add task','error');
-    }
+        const obj={text,done:false,created_at:new Date().toISOString()};
+        if(dbMode==='cloud'&&supabaseClient&&currentUser) { obj.user_id=currentUser.id; const {error}=await supabaseClient.from('todos').insert(obj).select().single(); if(error) throw error; }
+        else { const l=getLocal('guest_todos'); obj.id=uid(); l.unshift(obj); setLocal('guest_todos',l); }
+        input.value=''; showToast('Task added'); await refreshAllData();
+    } catch(e) { console.error(e); showToast('Failed','error'); }
 }
-
 async function toggleTodo(id) {
     try {
-        console.log('✓ Toggling todo:', id);
-        const todos = await getTodos();
-        const t = todos.find(x => x.id === id);
-        if(!t) {
-            console.error('❌ Todo not found:', id);
-            return;
-        }
-
-        // Mark as completing (animation)
-        const items = document.querySelectorAll(`[data-todo-id="${id}"]`);
-        items.forEach(item => item.classList.add('completing'));
-
-        showToast('✅ Task completed!');
-
-        // Wait for animation then delete
-        setTimeout(async () => {
-            try {
-                if(dbMode==='cloud' && supabaseClient && currentUser) {
-                    await supabaseClient.from('todos').delete().eq('id',id).eq('user_id',currentUser.id);
-                } else {
-                    const l = getLocal('guest_todos');
-                    setLocal('guest_todos', l.filter(x => x.id !== id));
-                }
-                await refreshAllData();
-            } catch(e) {
-                console.error('❌ Error deleting completed todo:', e);
-            }
-        }, 400);
-    } catch(e) {
-        console.error('❌ Error toggling todo:', e);
-    }
+        const todos=await getTodos(); const t=todos.find(x=>x.id===id); if(!t) return;
+        document.querySelectorAll(`[data-todo-id="${id}"]`).forEach(el=>el.classList.add('completing'));
+        showToast('✅ Completed!');
+        setTimeout(async()=>{
+            if(dbMode==='cloud'&&supabaseClient&&currentUser) await supabaseClient.from('todos').delete().eq('id',id).eq('user_id',currentUser.id);
+            else setLocal('guest_todos',getLocal('guest_todos').filter(x=>x.id!==id));
+            await refreshAllData();
+        },400);
+    } catch(e) { console.error(e); }
 }
-
 async function deleteTodo(id) {
     if(!confirm('Delete task?')) return;
-    try {
-        if(dbMode==='cloud' && supabaseClient && currentUser) {
-            await supabaseClient.from('todos').delete().eq('id',id).eq('user_id',currentUser.id);
-        } else {
-            setLocal('guest_todos', getLocal('guest_todos').filter(t => t.id !== id));
-        }
-        await refreshAllData();
-        showToast('Deleted');
-    } catch(e) {
-        console.error('❌ Error deleting todo:', e);
-        showToast('Failed to delete','error');
-    }
+    if(dbMode==='cloud'&&supabaseClient&&currentUser) await supabaseClient.from('todos').delete().eq('id',id).eq('user_id',currentUser.id);
+    else setLocal('guest_todos',getLocal('guest_todos').filter(t=>t.id!==id));
+    refreshAllData(); showToast('Deleted');
 }
-
 async function renderTodos() {
-    try {
-        console.log('🎨 Rendering todos...');
-        const todos = await getTodos();
-        const c = document.getElementById('todoListContainer');
-        const empty = document.getElementById('todoEmpty');
-        
-        if (!c) {
-            console.error('❌ todoListContainer not found');
-            return;
-        }
-        
-        c.innerHTML = '';
-
-        if(!todos.length) {
-            console.log('📭 No todos to display');
-            if(empty) empty.style.display = 'block';
-            await renderDashTodos([]);
-            return;
-        }
-        
-        if(empty) empty.style.display = 'none';
-
-        // Sort: pending first, then by date
-        const sorted = [...todos].sort((a,b) => {
-            if (a.done !== b.done) return a.done ? 1 : -1;
-            return new Date(b.created_at) - new Date(a.created_at);
-        });
-
-        sorted.forEach(t => {
-            const d = document.createElement('div');
-            d.className = 'todo-item';
-            d.setAttribute('data-todo-id', t.id);
-            const dateStr = t.created_at ? new Date(t.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
-            d.innerHTML = `
-                <div class="todo-checkbox ${t.done?'checked':''}" onclick="toggleTodo('${t.id}')">${t.done?'✓':''}</div>
-                <div style="flex:1;">
-                    <div class="todo-text ${t.done?'completed':''}">${escapeHtml(t.text)}</div>
-                    ${dateStr ? `<div class="todo-date">${dateStr}</div>` : ''}
-                </div>
-                <button class="btn btn-sm btn-danger" onclick="deleteTodo('${t.id}')" style="width:32px;height:32px;padding:0;border-radius:50%;font-size:14px;">🗑️</button>
-            `;
-            c.appendChild(d);
-        });
-
-        await renderDashTodos(todos);
-        console.log('✅ Todos rendered successfully');
-    } catch(e) {
-        console.error('❌ Error rendering todos:', e);
-    }
+    const todos=await getTodos();
+    const c=document.getElementById('todoListContainer'); const empty=document.getElementById('todoEmpty');
+    if(!c) return; c.innerHTML='';
+    if(!todos.length){ if(empty) empty.style.display='block'; renderDashTodos([]); return; }
+    if(empty) empty.style.display='none';
+    const sorted=[...todos].sort((a,b)=>a.done-b.done);
+    sorted.forEach(t=>{
+        const d=document.createElement('div'); d.className='todo-item'; d.setAttribute('data-todo-id',t.id);
+        const ds=t.created_at?new Date(t.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+        d.innerHTML=`<div class="todo-checkbox ${t.done?'checked':''}" onclick="toggleTodo('${t.id}')">${t.done?'✓':''}</div><div style="flex:1;"><div class="todo-text ${t.done?'completed':''}">${escapeHtml(t.text)}</div>${ds?'<div class="todo-date">'+ds+'</div>':''}</div><button class="btn btn-sm btn-danger" onclick="deleteTodo('${t.id}')" style="width:32px;height:32px;padding:0;border-radius:50%;font-size:14px;">🗑️</button>`;
+        c.appendChild(d);
+    });
+    renderDashTodos(todos);
 }
-
-async function renderDashTodos(todos) {
-    const container = document.getElementById('dashTodoList');
-    const emptyMsg = document.getElementById('dashTodoEmpty');
-    const viewAllBtn = document.getElementById('viewAllTasksBtn');
-    const taskCount = document.getElementById('taskCount');
-    
-    if (!container) {
-        console.error('❌ dashTodoList not found');
-        return;
-    }
-
-    container.innerHTML = '';
-
-    // Filter only pending tasks
-    const pending = todos.filter(t => !t.done);
-
-    if (taskCount) {
-        taskCount.textContent = pending.length > 0 ? `${pending.length} pending` : '';
-    }
-
-    if(pending.length === 0) {
-        if(emptyMsg) emptyMsg.style.display = 'block';
-        if(viewAllBtn) viewAllBtn.style.display = todos.length > 0 ? 'block' : 'none';
-        return;
-    }
-    
-    if(emptyMsg) emptyMsg.style.display = 'none';
-    if(viewAllBtn) viewAllBtn.style.display = pending.length > 3 ? 'block' : 'none';
-
-    // Show max 3 tasks on dashboard
-    pending.slice(0, 3).forEach(t => {
-        const d = document.createElement('div');
-        d.className = 'dash-todo-item';
-        d.setAttribute('data-todo-id', t.id);
-        d.innerHTML = `
-            <div class="dash-todo-check" onclick="toggleTodo('${t.id}')">✓</div>
-            <div class="dash-todo-text">${escapeHtml(t.text)}</div>
-            <button class="dash-todo-del" onclick="deleteTodo('${t.id}')">🗑️</button>
-        `;
-        container.appendChild(d);
+function renderDashTodos(todos) {
+    const c=document.getElementById('dashTodoList'); const e=document.getElementById('dashTodoEmpty');
+    const v=document.getElementById('viewAllTasksBtn'); const tc=document.getElementById('taskCount');
+    if(!c) return; c.innerHTML='';
+    const p=todos.filter(t=>!t.done);
+    if(tc) tc.textContent=p.length>0?p.length+' pending':'';
+    if(!p.length){ if(e) e.style.display='block'; if(v) v.style.display=todos.length>0?'block':'none'; return; }
+    if(e) e.style.display='none'; if(v) v.style.display=p.length>3?'block':'none';
+    p.slice(0,3).forEach(t=>{
+        const d=document.createElement('div'); d.className='dash-todo-item'; d.setAttribute('data-todo-id',t.id);
+        d.innerHTML=`<div class="dash-todo-check" onclick="toggleTodo('${t.id}')">✓</div><div class="dash-todo-text">${escapeHtml(t.text)}</div><button class="dash-todo-del" onclick="deleteTodo('${t.id}')">🗑️</button>`;
+        c.appendChild(d);
     });
 }
+function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// ================== EXPENSE LOGIC ==================
+// ================== EXPENSE ==================
 async function addQuickExpense() {
-    const a = parseFloat(document.getElementById('quickAmount').value);
-    const c = document.getElementById('quickCategory').value;
-    const d = document.getElementById('quickDesc').value.trim();
-    const dt = new Date().toISOString().split('T')[0];
-    
-    if(!a || a <= 0) {
-        showToast('Enter valid amount','error');
-        return;
-    }
-    
-    try {
-        await saveExpense({date:dt, category:c, amount:a, description:d});
-        showToast('Added!'); 
-        document.getElementById('quickAmount').value = ''; 
-        document.getElementById('quickDesc').value = ''; 
-        await refreshAllData();
-    } catch(e) {
-        console.error('Error adding expense:', e);
-        showToast('Failed to add expense','error');
-    }
+    const a=parseFloat(document.getElementById('quickAmount').value); const c=document.getElementById('quickCategory').value;
+    const d=document.getElementById('quickDesc').value.trim(); const dt=new Date().toISOString().split('T')[0];
+    if(!a||a<=0){showToast('Enter valid amount','error');return;}
+    await saveExpense({date:dt,category:c,amount:a,description:d});
+    showToast('Added!'); document.getElementById('quickAmount').value=''; document.getElementById('quickDesc').value=''; refreshAllData();
 }
-
 async function addExpense() {
-    const dt = document.getElementById('expDate').value; 
-    const c = document.getElementById('expCategory').value;
-    const a = parseFloat(document.getElementById('expAmount').value); 
-    const d = document.getElementById('expDesc').value.trim();
-    
-    if(!dt || !a || a <= 0) {
-        showToast('Enter date & amount','error');
-        return;
-    }
-    
-    try {
-        await saveExpense({date:dt, category:c, amount:a, description:d});
-        showToast('Saved'); 
-        document.getElementById('expAmount').value = ''; 
-        document.getElementById('expDesc').value = ''; 
-        await refreshAllData();
-    } catch(e) {
-        console.error('Error adding expense:', e);
-        showToast('Failed to save','error');
-    }
+    const dt=document.getElementById('expDate').value; const c=document.getElementById('expCategory').value;
+    const a=parseFloat(document.getElementById('expAmount').value); const d=document.getElementById('expDesc').value.trim();
+    if(!dt||!a||a<=0){showToast('Enter date & amount','error');return;}
+    await saveExpense({date:dt,category:c,amount:a,description:d});
+    showToast('Saved'); document.getElementById('expAmount').value=''; document.getElementById('expDesc').value=''; refreshAllData();
 }
-
 async function renderExpenses() {
-    const f = document.getElementById('expFilter')?.value || 'all';
-    const s = (document.getElementById('expSearch')?.value || '').toLowerCase();
-    let list = await getExpenses(); 
-    const today = new Date().toISOString().split('T')[0];
-    
-    if(f === 'month') list = list.filter(e => e.date && e.date.startsWith(today.slice(0,7)));
-    if(s) list = list.filter(e => (e.description||'').toLowerCase().includes(s) || (e.category||'').includes(s));
-    
-    const tb = document.getElementById('expenseTableBody'); 
-    if(!tb) return; 
-    tb.innerHTML = '';
-    
-    if(!list.length) {
-        tb.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light);">No data</td></tr>';
-        return;
-    }
-    
-    const lb = {market:'🛒', shopping:'🛍️', bike_maintenance:'🔧', fuel:'⛽', emi:'💳', other:'📦'};
-    list.slice(0,20).forEach(e => {
-        tb.innerHTML += `<tr><td>${(e.date||'').slice(5)}</td><td><span class="badge badge-${e.category||'other'}">${lb[e.category]||'📦'}</span></td><td style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.description||'—'}</td><td style="font-weight:600;">৳${parseFloat(e.amount||0).toFixed(0)}</td><td><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')" style="padding:4px 8px;">🗑️</button></td></tr>`;
-    });
+    const f=document.getElementById('expFilter')?.value||'all'; const s=(document.getElementById('expSearch')?.value||'').toLowerCase();
+    let list=await getExpenses(); const today=new Date().toISOString().split('T')[0];
+    if(f==='month') list=list.filter(e=>e.date&&e.date.startsWith(today.slice(0,7)));
+    if(s) list=list.filter(e=>(e.description||'').toLowerCase().includes(s)||(e.category||'').includes(s));
+    const tb=document.getElementById('expenseTableBody'); if(!tb) return; tb.innerHTML='';
+    if(!list.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light);">No data</td></tr>';return;}
+    const lb={market:'🛒',shopping:'🛍️',bike_maintenance:'🔧',fuel:'⛽',emi:'💳',other:'📦'};
+    list.slice(0,20).forEach(e=>{ tb.innerHTML+=`<tr><td>${(e.date||'').slice(5)}</td><td><span class="badge badge-${e.category||'other'}">${lb[e.category]||'📦'}</span></td><td style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.description||'—'}</td><td style="font-weight:600;">৳${parseFloat(e.amount||0).toFixed(0)}</td><td><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')" style="padding:4px 8px;">🗑️</button></td></tr>`; });
 }
 
-// ================== BIKE LOGIC ==================
+// ================== BIKE ==================
 async function addBikeRecord() {
-    const dt = document.getElementById('bikeDate').value; 
-    const tp = document.getElementById('bikeType').value;
-    const odo = parseFloat(document.getElementById('bikeOdometer').value) || 0;
-    const amt = parseFloat(document.getElementById('bikeAmount').value) || 0;
-    const fq = parseFloat(document.getElementById('bikeFuelQty').value) || 0;
-    const n = document.getElementById('bikeNotes').value.trim();
-    
-    if(!dt || odo <= 0) {
-        showToast('Enter date & odometer','error');
-        return;
-    }
-    
-    let mileage = null;
-    if(tp === 'fuel' && fq > 0) {
-        const all = await getBike();
-        const prev = all.filter(r => r.type === 'fuel' && r.odometer < odo).sort((a,b) => b.odometer - a.odometer)[0];
-        if(prev) {
-            const d = odo - prev.odometer;
-            if(d > 0) mileage = +(d/fq).toFixed(2);
-        }
-    }
-    
-    try {
-        await saveBike({date:dt, type:tp, odometer:odo, amount:amt, fuel_qty:fq, mileage, notes:n});
-        showToast('Saved'); 
-        ['bikeAmount','bikeFuelQty','bikeNotes','bikeOdometer'].forEach(id => document.getElementById(id).value = ''); 
-        await refreshAllData();
-    } catch(e) {
-        console.error('Error adding bike record:', e);
-        showToast('Failed to save','error');
-    }
+    const dt=document.getElementById('bikeDate').value; const tp=document.getElementById('bikeType').value;
+    const odo=parseFloat(document.getElementById('bikeOdometer').value)||0; const amt=parseFloat(document.getElementById('bikeAmount').value)||0;
+    const fq=parseFloat(document.getElementById('bikeFuelQty').value)||0; const n=document.getElementById('bikeNotes').value.trim();
+    if(!dt||odo<=0){showToast('Enter date & odometer','error');return;}
+    let mileage=null;
+    if(tp==='fuel'&&fq>0){const all=await getBike();const prev=all.filter(r=>r.type==='fuel'&&r.odometer<odo).sort((a,b)=>b.odometer-a.odometer)[0];if(prev){const d=odo-prev.odometer;if(d>0)mileage=+(d/fq).toFixed(2);}}
+    await saveBike({date:dt,type:tp,odometer:odo,amount:amt,fuel_qty:fq,mileage,notes:n});
+    showToast('Saved'); ['bikeAmount','bikeFuelQty','bikeNotes','bikeOdometer'].forEach(id=>document.getElementById(id).value=''); refreshAllData();
 }
-
 async function renderBikeRecords() {
-    const recs = await getBike(); 
-    const tb = document.getElementById('bikeTableBody'); 
-    if(!tb) return; 
-    tb.innerHTML = '';
-    
-    if(!recs.length) {
-        tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-light);">No records</td></tr>';
-        return;
-    }
-    
-    recs.slice(0,15).forEach(r => {
-        tb.innerHTML += `<tr><td>${(r.date||'').slice(5)}</td><td><span class="badge badge-${r.type}">${r.type}</span></td><td>${r.odometer||'—'}</td><td style="font-weight:600;">৳${parseFloat(r.amount||0).toFixed(0)}</td><td>${r.mileage?r.mileage+' km/L':'—'}</td><td><button class="btn btn-sm btn-danger" onclick="deleteBike('${r.id}')" style="padding:4px 8px;">🗑️</button></td></tr>`;
-    });
+    const recs=await getBike(); const tb=document.getElementById('bikeTableBody'); if(!tb) return; tb.innerHTML='';
+    if(!recs.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-light);">No records</td></tr>';return;}
+    recs.slice(0,15).forEach(r=>{ tb.innerHTML+=`<tr><td>${(r.date||'').slice(5)}</td><td><span class="badge badge-${r.type}">${r.type}</span></td><td>${r.odometer||'—'}</td><td style="font-weight:600;">৳${parseFloat(r.amount||0).toFixed(0)}</td><td>${r.mileage?r.mileage+' km/L':'—'}</td><td><button class="btn btn-sm btn-danger" onclick="deleteBike('${r.id}')" style="padding:4px 8px;">🗑️</button></td></tr>`; });
 }
-
 async function renderBikeStats() {
-    const recs = await getBike(); 
-    const c = document.getElementById('bikeStats'); 
-    if(!c) return;
-    
-    const fuel = recs.filter(r => r.type === 'fuel'); 
-    const maint = recs.filter(r => r.type === 'maintenance');
-    const tf = fuel.reduce((s,r) => s + parseFloat(r.amount||0), 0);
-    const tm = maint.reduce((s,r) => s + parseFloat(r.amount||0), 0);
-    const tq = fuel.reduce((s,r) => s + parseFloat(r.fuel_qty||0), 0);
-    const wm = fuel.filter(r => r.mileage); 
-    const am = wm.length ? (wm.reduce((s,r) => s + r.mileage, 0) / wm.length) : 0;
-    
-    c.innerHTML = `
-        <div class="stat-card"><div class="icon-bg">⛽</div><div class="label">Fuel Cost</div><div class="value">৳${tf.toFixed(0)}</div><div class="sub">${fuel.length} refuels</div></div>
-        <div class="stat-card warning"><div class="icon-bg">🔧</div><div class="label">Maint.</div><div class="value">৳${tm.toFixed(0)}</div><div class="sub">${maint.length} services</div></div>
-        <div class="stat-card info"><div class="icon-bg">📏</div><div class="label">Mileage</div><div class="value">${am.toFixed(1)}</div><div class="sub">km/L</div></div>
-        <div class="stat-card danger"><div class="icon-bg">💧</div><div class="label">Fuel Used</div><div class="value">${tq.toFixed(1)}L</div><div class="sub">total</div></div>`;
+    const recs=await getBike(); const c=document.getElementById('bikeStats'); if(!c) return;
+    const fuel=recs.filter(r=>r.type==='fuel'); const maint=recs.filter(r=>r.type==='maintenance');
+    const tf=fuel.reduce((s,r)=>s+parseFloat(r.amount||0),0); const tm=maint.reduce((s,r)=>s+parseFloat(r.amount||0),0);
+    const tq=fuel.reduce((s,r)=>s+parseFloat(r.fuel_qty||0),0); const wm=fuel.filter(r=>r.mileage); const am=wm.length?(wm.reduce((s,r)=>s+r.mileage,0)/wm.length):0;
+    c.innerHTML=`<div class="stat-card"><div class="icon-bg">⛽</div><div class="label">Fuel Cost</div><div class="value">৳${tf.toFixed(0)}</div><div class="sub">${fuel.length} refuels</div></div><div class="stat-card warning"><div class="icon-bg">🔧</div><div class="label">Maint.</div><div class="value">৳${tm.toFixed(0)}</div><div class="sub">${maint.length} services</div></div><div class="stat-card info"><div class="icon-bg">📏</div><div class="label">Mileage</div><div class="value">${am.toFixed(1)}</div><div class="sub">km/L</div></div><div class="stat-card danger"><div class="icon-bg">💧</div><div class="label">Fuel Used</div><div class="value">${tq.toFixed(1)}L</div><div class="sub">total</div></div>`;
 }
 
-// ================== EMI LOGIC ==================
+// ================== EMI ==================
 async function addEmiPlan() {
-    const n = document.getElementById('emiName').value.trim();
-    const t = parseFloat(document.getElementById('emiTotal').value) || 0;
-    const m = parseFloat(document.getElementById('emiMonthly').value) || 0;
-    const mo = parseInt(document.getElementById('emiMonths').value) || 0;
-    
-    if(!n || t <= 0 || m <= 0 || mo <= 0) {
-        showToast('Fill all fields','error');
-        return;
-    }
-    
-    try {
-        await saveEmi({name:n, total_amount:t, monthly_payment:m, num_months:mo, paid_months:0});
-        showToast('Plan added'); 
-        ['emiName','emiTotal','emiMonthly','emiMonths'].forEach(id => document.getElementById(id).value = ''); 
-        await refreshAllData();
-    } catch(e) {
-        console.error('Error adding EMI plan:', e);
-        showToast('Failed to save','error');
-    }
+    const n=document.getElementById('emiName').value.trim(); const t=parseFloat(document.getElementById('emiTotal').value)||0;
+    const m=parseFloat(document.getElementById('emiMonthly').value)||0; const mo=parseInt(document.getElementById('emiMonths').value)||0;
+    if(!n||t<=0||m<=0||mo<=0){showToast('Fill all fields','error');return;}
+    await saveEmi({name:n,total_amount:t,monthly_payment:m,num_months:mo,paid_months:0});
+    showToast('Plan added'); ['emiName','emiTotal','emiMonthly','emiMonths'].forEach(id=>document.getElementById(id).value=''); refreshAllData();
 }
-
 async function renderEmiPlans() {
-    const plans = await getEmis(); 
-    const c = document.getElementById('emiPlansContainer'); 
-    if(!c) return; 
-    c.innerHTML = '';
-    
-    if(!plans.length) {
-        c.innerHTML = '<p style="text-align:center;color:var(--text-light);padding:20px;">No plans</p>';
-        return;
-    }
-    
-    plans.forEach(p => {
-        const pa = (p.paid_months||0) * p.monthly_payment; 
-        const pct = Math.min(100, (pa/p.total_amount)*100);
-        c.innerHTML += `<div class="card" style="margin-bottom:12px;padding:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <strong>${p.name}</strong>
-                <div style="display:flex;gap:6px;">
-                    <button class="btn btn-sm btn-success" onclick="markEmiPaid('${p.id}')">✓ Pay</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteEmi('${p.id}')">🗑️</button>
-                </div>
-            </div>
-            <div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">Total: ৳${Number(p.total_amount).toLocaleString()} | Monthly: ৳${Number(p.monthly_payment).toLocaleString()}</div>
-            <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pct>=100?'var(--success)':'var(--primary)'}"></div></div>
-            <div style="font-size:11px;color:var(--text-light);margin-top:4px;text-align:right;">${p.paid_months||0}/${p.num_months} (${pct.toFixed(0)}%)</div>
-        </div>`;
+    const plans=await getEmis(); const c=document.getElementById('emiPlansContainer'); if(!c) return; c.innerHTML='';
+    if(!plans.length){c.innerHTML='<p style="text-align:center;color:var(--text-light);padding:20px;">No plans</p>';return;}
+    plans.forEach(p=>{ const pa=(p.paid_months||0)*p.monthly_payment; const pct=Math.min(100,(pa/p.total_amount)*100);
+        c.innerHTML+=`<div class="card" style="margin-bottom:12px;padding:14px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><strong>${p.name}</strong><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-success" onclick="markEmiPaid('${p.id}')">✓ Pay</button><button class="btn btn-sm btn-danger" onclick="deleteEmi('${p.id}')">🗑️</button></div></div><div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">Total: ৳${Number(p.total_amount).toLocaleString()} | Monthly: ৳${Number(p.monthly_payment).toLocaleString()}</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pct>=100?'var(--success)':'var(--primary)'}"></div></div><div style="font-size:11px;color:var(--text-light);margin-top:4px;text-align:right;">${p.paid_months||0}/${p.num_months} (${pct.toFixed(0)}%)</div></div>`;
     });
 }
 
-// ================== DASHBOARD (FIXED - Now includes todos) ==================
-function getBudget() {
-    return parseFloat(localStorage.getItem('monthly_budget')||'0') || 0;
-}
-
-function saveBudget() {
-    localStorage.setItem('monthly_budget', parseFloat(document.getElementById('budgetInput').value)||0);
-    showToast('Budget saved');
-    renderDashboard();
-}
+// ================== DASHBOARD ==================
+function getBudget(){return parseFloat(localStorage.getItem('monthly_budget')||'0')||0;}
+function saveBudget(){localStorage.setItem('monthly_budget',parseFloat(document.getElementById('budgetInput').value)||0);showToast('Budget saved');renderDashboard();}
 
 async function renderDashboard() {
-    const exp = await getExpenses(); 
-    const now = new Date(); 
-    const today = now.toISOString().split('T')[0];
-    const mp = today.slice(0,7); 
-    const wa = new Date(now.getTime() - 7*86400000).toISOString().split('T')[0];
-    const tl = exp.filter(e => e.date === today); 
-    const wl = exp.filter(e => e.date >= wa);
-    const ml = exp.filter(e => e.date && e.date.startsWith(mp));
-    const ta = exp.reduce((s,e) => s + parseFloat(e.amount||0), 0);
-    const mt = ml.reduce((s,e) => s + parseFloat(e.amount||0), 0);
-
-    const ds = document.getElementById('dashStats');
-    if (ds) {
-        ds.innerHTML = `
-            <div class="stat-card"><div class="icon-bg">📅</div><div class="label">Today</div><div class="value">৳${tl.reduce((s,e) => s+parseFloat(e.amount||0), 0).toFixed(0)}</div><div class="sub">${tl.length} txns</div></div>
-            <div class="stat-card info"><div class="icon-bg">📆</div><div class="label">This Week</div><div class="value">৳${wl.reduce((s,e) => s+parseFloat(e.amount||0), 0).toFixed(0)}</div><div class="sub">${wl.length} txns</div></div>
-            <div class="stat-card warning"><div class="icon-bg">🗓️</div><div class="label">This Month</div><div class="value">৳${mt.toFixed(0)}</div><div class="sub">${ml.length} txns</div></div>
-            <div class="stat-card danger"><div class="icon-bg">📊</div><div class="label">All Time</div><div class="value">৳${ta.toFixed(0)}</div><div class="sub">${exp.length} txns</div></div>`;
-    }
-
-    const budget = getBudget(); 
-    const bi = document.getElementById('budgetInput'); 
-    if(bi) bi.value = budget || '';
-    
-    const bEl = document.getElementById('budgetProgress');
-    if(bEl) {
-        if(budget > 0) {
-            const u = Math.min(100, (mt/budget)*100); 
-            const col = u > 90 ? 'var(--danger)' : u > 70 ? 'var(--warning)' : 'var(--primary)';
-            bEl.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:4px;"><span>৳${mt.toFixed(0)} spent</span><span>৳${Math.max(0, budget-mt).toFixed(0)} left</span></div><div class="progress-bar"><div class="progress-fill" style="width:${u}%;background:${col}"></div></div>`;
-        } else { 
-            bEl.innerHTML = '<p style="color:var(--text-light);font-size:12px;text-align:center;padding:8px;">Set a budget above</p>'; 
-        }
-    }
-    
+    const exp=await getExpenses(); const now=new Date(); const today=now.toISOString().split('T')[0];
+    const mp=today.slice(0,7); const wa=new Date(now.getTime()-7*86400000).toISOString().split('T')[0];
+    const tl=exp.filter(e=>e.date===today); const wl=exp.filter(e=>e.date>=wa);
+    const ml=exp.filter(e=>e.date&&e.date.startsWith(mp));
+    const ta=exp.reduce((s,e)=>s+parseFloat(e.amount||0),0); const mt=ml.reduce((s,e)=>s+parseFloat(e.amount||0),0);
+    const ds=document.getElementById('dashStats');
+    if(ds) ds.innerHTML=`<div class="stat-card"><div class="icon-bg">📅</div><div class="label">Today</div><div class="value">৳${tl.reduce((s,e)=>s+parseFloat(e.amount||0),0).toFixed(0)}</div><div class="sub">${tl.length} txns</div></div><div class="stat-card info"><div class="icon-bg">📆</div><div class="label">This Week</div><div class="value">৳${wl.reduce((s,e)=>s+parseFloat(e.amount||0),0).toFixed(0)}</div><div class="sub">${wl.length} txns</div></div><div class="stat-card warning"><div class="icon-bg">🗓️</div><div class="label">This Month</div><div class="value">৳${mt.toFixed(0)}</div><div class="sub">${ml.length} txns</div></div><div class="stat-card danger"><div class="icon-bg">📊</div><div class="label">All Time</div><div class="value">৳${ta.toFixed(0)}</div><div class="sub">${exp.length} txns</div></div>`;
+    const budget=getBudget(); const bi=document.getElementById('budgetInput'); if(bi) bi.value=budget||'';
+    const bEl=document.getElementById('budgetProgress');
+    if(bEl) { if(budget>0){ const u=Math.min(100,(mt/budget)*100); const col=u>90?'var(--danger)':u>70?'var(--warning)':'var(--primary)'; bEl.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:4px;"><span>৳${mt.toFixed(0)} spent</span><span>৳${Math.max(0,budget-mt).toFixed(0)} left</span></div><div class="progress-bar"><div class="progress-fill" style="width:${u}%;background:${col}"></div></div>`; } else { bEl.innerHTML='<p style="color:var(--text-light);font-size:12px;text-align:center;padding:8px;">Set a budget above</p>'; } }
     renderDashChart(exp);
-    
-    // 🔥 CRITICAL FIX: Render dashboard todos
-    const todos = await getTodos();
-    await renderDashTodos(todos);
+    const todos=await getTodos(); renderDashTodos(todos);
 }
-
 function renderDashChart(expenses) {
-    const canvas = document.getElementById('dashChart'); 
-    if(!canvas) return;
+    const canvas=document.getElementById('dashChart'); if(!canvas) return;
     if(charts.dash) charts.dash.destroy();
-    
-    const now = new Date(); 
-    const labels = []; 
-    const totals = new Array(6).fill(0);
-    
-    for(let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
-        labels.push(d.toLocaleString('en-US', {month:'short'}));
-    }
-    
-    expenses.forEach(e => {
-        if(!e.date) return;
-        const d = new Date(e.date);
-        const diff = (now.getFullYear()-d.getFullYear())*12 + (now.getMonth()-d.getMonth());
-        if(diff >= 0 && diff < 6) totals[5-diff] += parseFloat(e.amount||0);
-    });
-    
-    charts.dash = new Chart(canvas.getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels,
-            datasets: [{
-                data: totals,
-                backgroundColor: '#0d9488',
-                borderRadius: 6,
-                maxBarThickness: 30
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {legend: {display: false}},
-            scales: {
-                y: {beginAtZero: true, grid: {color: 'rgba(0,0,0,0.05)'}},
-                x: {grid: {display: false}}
-            }
-        }
-    });
+    const now=new Date(); const labels=[]; const totals=new Array(6).fill(0);
+    for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);labels.push(d.toLocaleString('en-US',{month:'short'}));}
+    expenses.forEach(e=>{if(!e.date)return;const d=new Date(e.date);const diff=(now.getFullYear()-d.getFullYear())*12+(now.getMonth()-d.getMonth());if(diff>=0&&diff<6)totals[5-diff]+=parseFloat(e.amount||0);});
+    charts.dash=new Chart(canvas.getContext('2d'),{type:'bar',data:{labels,datasets:[{data:totals,backgroundColor:'#0d9488',borderRadius:6,maxBarThickness:30}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false}}}}});
 }
-
 async function renderReportChart() {
-    const canvas = document.getElementById('reportChart'); 
-    if(!canvas) return;
+    const canvas=document.getElementById('reportChart'); if(!canvas) return;
     if(charts.report) charts.report.destroy();
-    
-    const expenses = await getExpenses();
-    const ms = document.getElementById('reportMonth')?.value || new Date().toISOString().slice(0,7);
-    const f = expenses.filter(e => e.date && e.date.startsWith(ms));
-    const cats = {market:0, shopping:0, bike_maintenance:0, fuel:0, emi:0, other:0};
-    
-    f.forEach(e => {
-        if(cats[e.category] !== undefined) cats[e.category] += parseFloat(e.amount||0);
-    });
-    
-    charts.report = new Chart(canvas.getContext('2d'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Market','Shopping','Bike','Fuel','EMI','Other'],
-            datasets: [{
-                data: Object.values(cats),
-                backgroundColor: ['#0ea5e9','#ec4899','#f59e0b','#ef4444','#8b5cf6','#64748b'],
-                borderWidth: 0,
-                hoverOffset: 8
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {padding: 12, usePointStyle: true, font: {size: 11}}
-                }
-            }
-        }
-    });
+    const expenses=await getExpenses(); const ms=document.getElementById('reportMonth')?.value||new Date().toISOString().slice(0,7);
+    const f=expenses.filter(e=>e.date&&e.date.startsWith(ms));
+    const cats={market:0,shopping:0,bike_maintenance:0,fuel:0,emi:0,other:0};
+    f.forEach(e=>{if(cats[e.category]!==undefined)cats[e.category]+=parseFloat(e.amount||0);});
+    charts.report=new Chart(canvas.getContext('2d'),{type:'doughnut',data:{labels:['Market','Shopping','Bike','Fuel','EMI','Other'],datasets:[{data:Object.values(cats),backgroundColor:['#0ea5e9','#ec4899','#f59e0b','#ef4444','#8b5cf6','#64748b'],borderWidth:0,hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{padding:12,usePointStyle:true,font:{size:11}}}}}});
 }
 
 // ================== PDF & CSV ==================
 async function downloadMonthlyPDF() {
-    const ms = document.getElementById('reportMonth')?.value; 
-    if(!ms) {
-        showToast('Select month','error');
-        return;
-    }
-    
-    const exp = await getExpenses(); 
-    const f = exp.filter(e => e.date && e.date.startsWith(ms));
-    
-    if(!f.length) {
-        showToast('No data','error');
-        return;
-    }
-    
-    const {jsPDF} = window.jspdf; 
-    const doc = new jsPDF();
-    doc.setFontSize(16); 
-    doc.text('Monthly Report', 105, 15, {align:'center'});
-    doc.setFontSize(10); 
-    doc.text(`Month: ${ms}`, 105, 22, {align:'center'});
-    doc.text(`Total: ৳${f.reduce((s,e) => s+parseFloat(e.amount||0), 0).toFixed(2)}`, 14, 35);
-    
-    doc.autoTable({
-        startY: 40,
-        head: [['Date','Category','Description','Amount']],
-        body: f.map(e => [e.date, e.category, e.description||'—', `৳${parseFloat(e.amount).toFixed(2)}`]),
-        theme: 'striped',
-        headStyles: {fillColor: [13, 148, 136]},
-        styles: {fontSize: 9}
-    });
-    
-    doc.save(`report-${ms}.pdf`); 
-    showToast('PDF downloaded');
+    const ms=document.getElementById('reportMonth')?.value; if(!ms){showToast('Select month','error');return;}
+    const f=(await getExpenses()).filter(e=>e.date&&e.date.startsWith(ms));
+    if(!f.length){showToast('No data','error');return;}
+    const {jsPDF}=window.jspdf; const doc=new jsPDF();
+    doc.setFontSize(16); doc.text('Monthly Report',105,15,{align:'center'});
+    doc.setFontSize(10); doc.text(`Month: ${ms}`,105,22,{align:'center'});
+    doc.text(`Total: ৳${f.reduce((s,e)=>s+parseFloat(e.amount||0),0).toFixed(2)}`,14,35);
+    doc.autoTable({startY:40,head:[['Date','Category','Description','Amount']],body:f.map(e=>[e.date,e.category,e.description||'—',`৳${parseFloat(e.amount).toFixed(2)}`]),theme:'striped',headStyles:{fillColor:[13,148,136]},styles:{fontSize:9}});
+    doc.save(`report-${ms}.pdf`); showToast('PDF downloaded');
 }
-
 async function downloadCSV() {
-    const ms = document.getElementById('reportMonth')?.value; 
-    if(!ms) {
-        showToast('Select month','error');
-        return;
-    }
-    
-    const f = (await getExpenses()).filter(e => e.date && e.date.startsWith(ms));
-    
-    if(!f.length) {
-        showToast('No data','error');
-        return;
-    }
-    
-    let csv = 'Date,Category,Description,Amount\n';
-    f.forEach(e => {
-        csv += `${e.date},${e.category},"${(e.description||'').replace(/"/g,'""')}",${e.amount}\n`;
-    });
-    
-    const a = document.createElement('a'); 
-    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'})); 
-    a.download = `expenses-${ms}.csv`; 
-    a.click(); 
-    showToast('CSV exported');
+    const ms=document.getElementById('reportMonth')?.value; if(!ms){showToast('Select month','error');return;}
+    const f=(await getExpenses()).filter(e=>e.date&&e.date.startsWith(ms));
+    if(!f.length){showToast('No data','error');return;}
+    let csv='Date,Category,Description,Amount\n';
+    f.forEach(e=>{csv+=`${e.date},${e.category},"${(e.description||'').replace(/"/g,'""')}",${e.amount}\n`;});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=`expenses-${ms}.csv`; a.click(); showToast('CSV exported');
 }
 
-// ================== DATA EXPORT / IMPORT / CLEAR ==================
+// ================== DATA EXPORT/IMPORT/CLEAR ==================
 function exportAllData() {
-    const data = {
-        expenses: getLocal('guest_expenses'),
-        bike_records: getLocal('guest_bike_records'),
-        emi_plans: getLocal('guest_emi_plans'),
-        todos: getLocal('guest_todos'),
-        budget: localStorage.getItem('monthly_budget'),
-        exportDate: new Date().toISOString()
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `expense-backup-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    showToast('Backup downloaded');
+    const data={expenses:getLocal('guest_expenses'),bike_records:getLocal('guest_bike_records'),emi_plans:getLocal('guest_emi_plans'),todos:getLocal('guest_todos'),budget:localStorage.getItem('monthly_budget'),exportDate:new Date().toISOString()};
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})); a.download=`backup-${new Date().toISOString().split('T')[0]}.json`; a.click(); showToast('Backup downloaded');
 }
-
 function importAllData(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            if (data.expenses) setLocal('guest_expenses', data.expenses);
-            if (data.bike_records) setLocal('guest_bike_records', data.bike_records);
-            if (data.emi_plans) setLocal('guest_emi_plans', data.emi_plans);
-            if (data.todos) setLocal('guest_todos', data.todos);
-            if (data.budget) localStorage.setItem('monthly_budget', data.budget);
-            showToast('Data imported!');
-            await refreshAllData();
-        } catch(err) {
-            console.error('Import error:', err);
-            showToast('Invalid backup file', 'error');
-        }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
+    const file=event.target.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=function(e){ try { const d=JSON.parse(e.target.result); if(d.expenses)setLocal('guest_expenses',d.expenses); if(d.bike_records)setLocal('guest_bike_records',d.bike_records); if(d.emi_plans)setLocal('guest_emi_plans',d.emi_plans); if(d.todos)setLocal('guest_todos',d.todos); if(d.budget)localStorage.setItem('monthly_budget',d.budget); showToast('Imported!'); refreshAllData(); } catch(err){ showToast('Invalid file','error'); } };
+    reader.readAsText(file); event.target.value='';
 }
-
 function clearAllData() {
-    if (!confirm('⚠️ This will delete ALL your data. Are you sure?')) return;
-    if (!confirm('Last chance! This cannot be undone.')) return;
-    
-    ['guest_expenses','guest_bike_records','guest_emi_plans','guest_todos','monthly_budget'].forEach(k => localStorage.removeItem(k));
-    showToast('All data cleared');
-    refreshAllData();
+    if(!confirm('⚠️ Delete ALL data?')) return;
+    if(!confirm('Last chance!')) return;
+    ['guest_expenses','guest_bike_records','guest_emi_plans','guest_todos','monthly_budget'].forEach(k=>localStorage.removeItem(k));
+    showToast('All cleared'); refreshAllData();
 }
 
 // ================== REFRESH ==================
 async function refreshAllData() {
     try {
-        console.log('🔄 Refreshing all data...');
-        await renderDashboard();
-        await renderExpenses();
-        await renderBikeRecords();
-        await renderBikeStats();
-        await renderEmiPlans();
-        await renderTodos();
-        if(currentSection === 'reports-temp') await renderReportChart();
-        console.log('✅ Refresh complete');
-    } catch(e) { 
-        console.error('❌ Refresh error:', e); 
-    }
+        await renderDashboard(); await renderExpenses(); await renderBikeRecords();
+        await renderBikeStats(); await renderEmiPlans(); await renderTodos();
+        if(currentSection==='reports-temp') await renderReportChart();
+    } catch(e) { console.error('Refresh error:',e); }
 }
 </script>
 </body>
