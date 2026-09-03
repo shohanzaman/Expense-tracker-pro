@@ -1004,7 +1004,7 @@
             <div class="logo">💰</div>
             <h2>Expense Tracker Pro</h2>
             <p>Track expenses, bike costs, EMI &amp; To-Dos.</p>
-            <button class="auth-btn google" onclick="loginWithGoogle()">
+            <button class="auth-btn google" id="googleLoginBtn" onclick="loginWithGoogle()">
                 <svg width="18" height="18" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -1015,6 +1015,7 @@
             </button>
             <div class="auth-divider">OR</div>
             <button class="auth-btn guest" onclick="continueAsGuest()">👤 Continue as Guest</button>
+            <div id="authError" style="color:var(--danger);font-size:13px;margin-top:10px;display:none;"></div>
         </div>
     </div>
 
@@ -1279,7 +1280,7 @@
 
     <script>
         // ================================================================
-        //  CONFIG
+        //  CONFIG — FIXED Supabase credentials
         // ================================================================
         const SUPABASE_URL = 'https://vfhjbxoichiwadtmfntg.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_J_DMSRvrGPf477Zy8gAbqw_hKDLopMV';
@@ -1398,7 +1399,7 @@
         function setBudget(val) { setLS(LS_BUDGET, val); }
 
         // ================================================================
-        //  AUTH
+        //  AUTH — FIXED: better error handling & redirect
         // ================================================================
         function isSupabaseConfigured() {
             return SUPABASE_URL && !SUPABASE_URL.includes('YOUR-PROJECT') &&
@@ -1407,19 +1408,48 @@
         }
 
         async function loginWithGoogle() {
+            const errorEl = document.getElementById('authError');
+            errorEl.style.display = 'none';
+            errorEl.textContent = '';
+
             if (!supabaseClient) {
-                showToast('Supabase not configured. Use Guest mode.', 'error');
+                errorEl.textContent = '⚠️ Supabase not initialized. Please use Guest mode.';
+                errorEl.style.display = 'block';
                 return;
             }
+
             try {
-                const { error } = await supabaseClient.auth.signInWithOAuth({
+                // Show loading state
+                const btn = document.getElementById('googleLoginBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '⏳ Signing in...';
+                btn.disabled = true;
+
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({
                     provider: 'google',
-                    options: { redirectTo: window.location.origin }
+                    options: {
+                        redirectTo: window.location.origin + window.location.pathname,
+                        queryParams: { access_type: 'offline', prompt: 'consent' }
+                    }
                 });
+
                 if (error) throw error;
+
+                // If we get here, the user is redirected to Google.
+                // The session will be picked up after redirect.
+                // Show a message
+                showToast('Redirecting to Google...', 'success');
+
             } catch (e) {
-                console.error('Login error:', e);
-                showToast('Login failed: ' + e.message, 'error');
+                console.error('Google login error:', e);
+                errorEl.textContent = '❌ ' + (e.message || 'Login failed. Please try again.');
+                errorEl.style.display = 'block';
+                showToast('Login failed: ' + (e.message || 'Unknown error'), 'error');
+                // Re-enable button
+                const btn = document.getElementById('googleLoginBtn');
+                btn.innerHTML =
+                    `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Sign in with Google`;
+                btn.disabled = false;
             }
         }
 
@@ -1455,11 +1485,19 @@
                     updateSettingsUI();
                     showToast('Welcome back, ' + (currentUser.user_metadata?.full_name || currentUser.email));
                     refreshAllData();
+                } else {
+                    // No session: show overlay (keep visible)
+                    console.log('No active session, showing auth overlay');
                 }
-                // else keep overlay visible
             } catch (e) {
                 console.warn('Session check failed:', e);
-                // don't force guest here — let user choose
+                // Don't force guest mode here — let user choose
+                // But we'll show a small error in the overlay
+                const errorEl = document.getElementById('authError');
+                if (errorEl) {
+                    errorEl.textContent = '⚠️ Could not connect to Supabase. You can continue as Guest.';
+                    errorEl.style.display = 'block';
+                }
             }
         }
 
@@ -1496,23 +1534,22 @@
             dbMode = 'guest';
             updateSettingsUI();
             showToast('Signed out');
+            // Reload to show auth overlay again
+            location.reload();
         }
 
         // ================================================================
         //  NAVIGATION
         // ================================================================
         function showSection(id) {
-            // Hide all sections
             document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
             const target = document.getElementById('section-' + id);
             if (target) target.classList.add('active');
 
-            // Update nav
             document.querySelectorAll('.nav-item-bottom').forEach(el => {
                 el.classList.toggle('active', el.dataset.section === id);
             });
 
-            // Page title
             const titles = {
                 dashboard: 'Dashboard',
                 daily: 'Daily Expenses',
@@ -1526,7 +1563,6 @@
 
             currentSection = id;
 
-            // Refresh data on switch
             if (id === 'dashboard') refreshDashboard();
             if (id === 'daily') renderExpenses();
             if (id === 'bike') renderBikeRecords();
@@ -1534,7 +1570,6 @@
             if (id === 'todo') renderTodos();
             if (id === 'reports-temp') initReportChart();
 
-            // Set default dates
             if (id === 'daily') {
                 const dateInput = document.getElementById('expDate');
                 if (dateInput && !dateInput.value) dateInput.value = getToday();
@@ -1586,10 +1621,6 @@
         // ================================================================
         //  EXIT CONFIRM
         // ================================================================
-        function setupExitConfirm() {
-            // Handled by onclick in HTML
-        }
-
         function cancelExit() {
             document.getElementById('confirmExit').classList.remove('show');
         }
@@ -1603,7 +1634,6 @@
             }
         }
 
-        // Back button handling
         document.addEventListener('backbutton', (e) => {
             e.preventDefault();
             document.getElementById('confirmExit').classList.add('show');
@@ -1682,7 +1712,6 @@
             showToast('Theme: ' + val);
         }
 
-        // System theme listener
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
             const pref = localStorage.getItem(LS_THEME) || 'system';
             if (pref === 'system') applyTheme('system');
@@ -1719,7 +1748,6 @@
             const pm = document.getElementById(prefix + 'PaymentMethod').value;
             const group = document.getElementById(prefix + 'CardGroup');
             if (group) group.style.display = (pm === 'card') ? 'block' : 'none';
-            // Fix grid-column for exp
             if (prefix === 'exp' && group) {
                 group.style.gridColumn = '1 / -1';
             }
@@ -1862,7 +1890,6 @@
             }
 
             const records = getBikeRecords();
-            // Calculate mileage if fuel record and previous fuel record exists
             let mileage = null;
             if (type === 'fuel' && fuelQty > 0) {
                 const sorted = [...records].filter(r => r.type === 'fuel').sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -1926,7 +1953,6 @@
                     </tr>
                 `).join('');
 
-            // Stats
             updateBikeStats();
         }
 
@@ -2157,7 +2183,6 @@
                     <div class="stat-card danger"><div class="icon-bg">✅</div><div class="label">Pending Tasks</div><div class="value">${pendingTodos.length}</div><div class="sub">${todos.length} total</div></div>
                 `;
 
-            // Task count
             const countEl = document.getElementById('taskCount');
             if (countEl) countEl.textContent = pendingTodos.length + ' pending';
         }
@@ -2235,7 +2260,6 @@
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
 
-            // Get last 6 months
             const months = [];
             const totals = [];
             const now = new Date();
@@ -2476,50 +2500,73 @@
         }
 
         // ================================================================
-        //  INIT
+        //  INIT — FIXED: better initialization
         // ================================================================
         document.addEventListener('DOMContentLoaded', async () => {
             console.log('🚀 Expense Tracker Pro starting...');
 
-            // Set up Supabase
-            if (isSupabaseConfigured() && typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-                try {
-                    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                    console.log('✅ Supabase client ready');
-                    await checkExistingSession();
-                } catch (e) {
-                    console.warn('Supabase init error:', e);
-                    forceGuestMode();
-                }
-            } else {
-                console.log('⚡ Using Guest mode (Supabase not configured)');
-                forceGuestMode();
-            }
-
-            // Set defaults
+            // 1. Set default dates and theme
             setDefaultDates();
             updateDateDisplay();
-
-            // Load theme
             loadTheme();
 
-            // Setup swipe
-            setupSwipe();
-
-            // Setup exit
-            setupExitConfirm();
-
-            // PWA
+            // 2. Setup PWA
             registerServiceWorker();
             setupPWAInstall();
 
-            // Render initial data
+            // 3. Setup swipe and exit
+            setupSwipe();
+            setupExitConfirm();
+
+            // 4. Supabase init
+            if (isSupabaseConfigured() && typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+                try {
+                    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                        auth: {
+                            autoRefreshToken: true,
+                            persistSession: true,
+                            detectSessionInUrl: true,
+                            storage: window.localStorage
+                        }
+                    });
+                    console.log('✅ Supabase client ready');
+
+                    // Check for session (including redirect from Google)
+                    await checkExistingSession();
+
+                    // If we are in cloud mode, refresh data from cloud (future)
+                    if (dbMode === 'cloud') {
+                        // You can add cloud sync here
+                    }
+
+                } catch (e) {
+                    console.error('❌ Supabase init error:', e);
+                    // Show error in auth overlay
+                    const errorEl = document.getElementById('authError');
+                    if (errorEl) {
+                        errorEl.textContent = '⚠️ Supabase connection error. You can continue as Guest.';
+                        errorEl.style.display = 'block';
+                    }
+                    // But don't force guest mode immediately — let user choose
+                }
+            } else {
+                console.log('⚡ Supabase not configured, using Guest mode');
+                // Show error in overlay
+                const errorEl = document.getElementById('authError');
+                if (errorEl) {
+                    errorEl.textContent = '⚠️ Supabase not configured. Continue as Guest.';
+                    errorEl.style.display = 'block';
+                }
+                // Let user click Guest or try Google (which will show error)
+            }
+
+            // 5. Render initial data (guest data will load)
             refreshAllData();
 
-            // Listen for report month change
+            // 6. Listen for report month change
             document.getElementById('reportMonth')?.addEventListener('change', initReportChart);
 
-            // Listen for system theme changes
+            // 7. Listen for system theme changes
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
                 const pref = localStorage.getItem(LS_THEME) || 'system';
                 if (pref === 'system') applyTheme('system');
@@ -2528,7 +2575,9 @@
             console.log('✅ App ready');
         });
 
-        // Expose all functions globally for inline onclick
+        // ================================================================
+        //  EXPOSE GLOBALS FOR INLINE ONCLICK
+        // ================================================================
         window.loginWithGoogle = loginWithGoogle;
         window.continueAsGuest = continueAsGuest;
         window.forceGuestMode = forceGuestMode;
