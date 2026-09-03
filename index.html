@@ -82,6 +82,10 @@
         .badge-market { background:#e0f2fe; color:#0369a1; } .badge-shopping { background:#fce7f3; color:#be185d; }
         .badge-bike_maintenance,.badge-maintenance { background:#fef3c7; color:#b45309; } .badge-fuel { background:#fee2e2; color:#b91c1c; }
         .badge-emi { background:#ede9fe; color:#6d28d9; } .badge-other { background:#f1f5f9; color:#475569; }
+        .pay-badge { display:inline-block; font-size:10px; padding:2px 6px; border-radius:4px; margin-top:4px; font-weight:600; }
+        .pay-cash { background:#dcfce7; color:#166534; }
+        .pay-bkash { background:#fce7f3; color:#be185d; }
+        .pay-card { background:#e0e7ff; color:#3730a3; }
         .progress-bar { height:8px; background:var(--border); border-radius:20px; overflow:hidden; margin-top:8px; }
         .progress-fill { height:100%; border-radius:20px; transition:width 0.5s ease; }
         .chart-container { position:relative; height:220px; width:100%; margin-top:8px; }
@@ -182,14 +186,30 @@
             <div class="card-header"><h3>⚡ Quick Add</h3></div>
             <div class="form-grid">
                 <div class="form-group"><label>Amount (৳)</label><input type="number" id="quickAmount" placeholder="0.00" min="0" step="0.01"></div>
-                <div class="form-group"><label>Category</label><select id="quickCategory"><option value="market">🛒 Market</option><option value="shopping">🛍️ Shopping</option><option value="bike_maintenance">🔧 Bike</option><option value="fuel">⛽ Fuel</option><option value="emi">💳 EMI</option><option value="other">📦 Other</option></select></div>
+                <div class="form-group"><label>Category</label>
+                    <select id="quickCategory">
+                        <option value="market">🛒 Market</option><option value="shopping">🛍️ Shopping</option>
+                        <option value="bike_maintenance">🔧 Bike</option><option value="fuel">⛽ Fuel</option>
+                        <option value="emi">💳 EMI</option><option value="other">📦 Other</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Payment Method</label>
+                    <select id="quickPaymentMethod" onchange="toggleCardInput('quick')">
+                        <option value="cash">💵 Cash</option>
+                        <option value="bkash"> bKash</option>
+                        <option value="card">💳 Card</option>
+                    </select>
+                </div>
+                <div class="form-group" id="quickCardGroup" style="display:none;"><label>Card Name</label><input type="text" id="quickCardName" placeholder="e.g. City Bank"></div>
                 <div class="form-group" style="grid-column:1/-1;"><label>Description</label><input type="text" id="quickDesc" placeholder="Optional note"></div>
             </div>
             <button class="btn btn-primary" onclick="addQuickExpense()">💾 Add Expense</button>
         </div>
+
         <div class="grid-cards" id="dashStats"></div>
+
         <div class="card">
-            <div class="card-header"><h3>📋 Today's Tasks</h3><span id="taskCount" style="font-size:11px;color:var(--text-light);font-weight:600;"></span></div>
+            <div class="card-header"><h3> Today's Tasks</h3><span id="taskCount" style="font-size:11px;color:var(--text-light);font-weight:600;"></span></div>
             <div style="display:flex;gap:8px;margin-bottom:12px;">
                 <input type="text" id="dashTodoInput" placeholder="Add a quick task..." style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;" onkeydown="if(event.key==='Enter')addDashTodo()">
                 <button class="btn btn-primary" onclick="addDashTodo()" style="width:auto;padding:10px 14px;">+</button>
@@ -198,6 +218,7 @@
             <div id="dashTodoEmpty" style="text-align:center;padding:16px;color:var(--text-light);font-size:13px;display:none;">🎉 All caught up! No pending tasks.</div>
             <button class="view-all-btn" onclick="showSection('todo')" id="viewAllTasksBtn" style="display:none;">View All Tasks →</button>
         </div>
+
         <div class="card">
             <div class="card-header"><h3>🎯 Monthly Budget</h3></div>
             <div style="display:flex;gap:8px;margin-bottom:12px;">
@@ -213,19 +234,29 @@
             <div class="card-header"><h3>➕ Add Expense</h3></div>
             <div class="form-grid">
                 <div class="form-group"><label>Date</label><input type="date" id="expDate"></div>
-                <div class="form-group"><label>Category</label><select id="expCategory"><option value="market">🛒 Market</option><option value="shopping">🛍️ Shopping</option><option value="bike_maintenance">🔧 Bike</option><option value="fuel">⛽ Fuel</option><option value="emi">💳 EMI</option><option value="other">📦 Other</option></select></div>
-                <div class="form-group"><label>Amount (৳)</label><input type="number" id="expAmount" placeholder="0.00"></div>
-                <div class="form-group"><label>Description</label><input type="text" id="expDesc" placeholder="Note"></div>
+                <div class="form-group"><label>Category</label>
+                    <select id="expCategory"><option value="market">🛒 Market</option><option value="shopping">🛍️ Shopping</option><option value="bike_maintenance">🔧 Bike</option><option value="fuel">⛽ Fuel</option><option value="emi">💳 EMI</option><option value="other">📦 Other</option></select>
+                </div>
+                <div class="form-group"><label>Amount ()</label><input type="number" id="expAmount" placeholder="0.00"></div>
+                <div class="form-group"><label>Payment Method</label>
+                    <select id="expPaymentMethod" onchange="toggleCardInput('exp')">
+                        <option value="cash">💵 Cash</option>
+                        <option value="bkash">📱 bKash</option>
+                        <option value="card">💳 Card</option>
+                    </select>
+                </div>
+                <div class="form-group" id="expCardGroup" style="display:none; grid-column:1/-1;"><label>Card Name</label><input type="text" id="expCardName" placeholder="e.g. City Bank Visa"></div>
+                <div class="form-group" style="grid-column:1/-1;"><label>Description</label><input type="text" id="expDesc" placeholder="Note"></div>
             </div>
             <button class="btn btn-primary" onclick="addExpense()">💾 Save</button>
         </div>
         <div class="card">
             <div class="card-header"><h3>📋 History</h3></div>
             <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-                <input type="text" id="expSearch" placeholder="🔍 Search..." oninput="renderExpenses()" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);">
+                <input type="text" id="expSearch" placeholder=" Search..." oninput="renderExpenses()" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);">
                 <select id="expFilter" onchange="renderExpenses()" style="padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);"><option value="all">All</option><option value="month">Month</option></select>
             </div>
-            <div class="table-responsive"><table><thead><tr><th>Date</th><th>Cat</th><th>Desc</th><th>Amount</th><th></th></tr></thead><tbody id="expenseTableBody"></tbody></table></div>
+            <div class="table-responsive"><table><thead><tr><th>Date</th><th>Details</th><th>Amount</th><th></th></tr></thead><tbody id="expenseTableBody"></tbody></table></div>
         </div>
     </div>
     <div class="section" id="section-bike">
@@ -272,7 +303,7 @@
     </div>
     <div class="section" id="section-settings">
         <div class="card">
-            <div class="card-header"><h3>👤 Account</h3></div>
+            <div class="card-header"><h3> Account</h3></div>
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
                 <div id="settingsAvatar" style="width:44px;height:44px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:18px;">G</div>
                 <div><div id="settingsUserName" style="font-weight:700;font-size:15px;">Guest User</div><div id="settingsUserEmail" style="font-size:12px;color:var(--text-light);">Local data only</div></div>
@@ -291,16 +322,16 @@
         <div class="settings-group">
             <div class="settings-group-title">App</div>
             <div class="settings-item" id="installSettingsItem" onclick="doInstall()" style="display:none;"><div class="settings-item-left"><span class="s-icon">📲</span><div><div class="s-label">Install App</div><div class="s-desc">Add to home screen</div></div></div><span class="settings-item-right">›</span></div>
-            <div class="settings-item" onclick="showSection('reports-temp')"><div class="settings-item-left"><span class="s-icon">📄</span><div><div class="s-label">Monthly Reports</div><div class="s-desc">Download PDF / CSV</div></div></div><span class="settings-item-right">›</span></div>
+            <div class="settings-item" onclick="showSection('reports-temp')"><div class="settings-item-left"><span class="s-icon"></span><div><div class="s-label">Monthly Reports</div><div class="s-desc">Download PDF / CSV</div></div></div><span class="settings-item-right">›</span></div>
             <div class="settings-item" onclick="exportAllData()"><div class="settings-item-left"><span class="s-icon">💾</span><div><div class="s-label">Export All Data</div><div class="s-desc">Backup as JSON file</div></div></div><span class="settings-item-right">›</span></div>
             <div class="settings-item" onclick="document.getElementById('importFile').click()"><div class="settings-item-left"><span class="s-icon">📂</span><div><div class="s-label">Import Data</div><div class="s-desc">Restore from JSON backup</div></div></div><span class="settings-item-right">›</span></div>
             <input type="file" id="importFile" accept=".json" style="display:none" onchange="importAllData(event)">
         </div>
         <div class="settings-group">
             <div class="settings-group-title">Danger Zone</div>
-            <div class="settings-item" onclick="clearAllData()"><div class="settings-item-left"><span class="s-icon">🗑️</span><div><div class="s-label" style="color:var(--danger);">Clear All Data</div><div class="s-desc">Delete everything permanently</div></div></div><span class="settings-item-right">›</span></div>
+            <div class="settings-item" onclick="clearAllData()"><div class="settings-item-left"><span class="s-icon">️</span><div><div class="s-label" style="color:var(--danger);">Clear All Data</div><div class="s-desc">Delete everything permanently</div></div></div><span class="settings-item-right">›</span></div>
         </div>
-        <div class="card" style="text-align:center;color:var(--text-light);font-size:12px;"><strong>Expense Tracker Pro</strong><br>Version 2.3 · PWA Enabled · Made with ❤️by KZS</div>
+        <div class="card" style="text-align:center;color:var(--text-light);font-size:12px;"><strong>Expense Tracker Pro</strong><br>Version 2.4 · PWA Enabled · Made with ❤️</div>
     </div>
     <div class="section" id="section-reports-temp">
         <div class="card">
@@ -317,24 +348,22 @@
     <button class="nav-item-bottom" data-section="bike" onclick="showSection('bike')"><span class="icon">🏍️</span><span>Bike</span></button>
     <button class="nav-item-bottom" data-section="emi" onclick="showSection('emi')"><span class="icon">💳</span><span>EMI</span></button>
     <button class="nav-item-bottom" data-section="todo" onclick="showSection('todo')"><span class="icon">✅</span><span>To-Do</span></button>
-    <button class="nav-item-bottom" data-section="settings" onclick="showSection('settings')"><span class="icon">⚙️</span><span>Settings</span></button>
+    <button class="nav-item-bottom" data-section="settings" onclick="showSection('settings')"><span class="icon">️</span><span>Settings</span></button>
 </nav>
 <script>
-// ================== CONFIG ==================
 const SUPABASE_URL = 'https://vfhjbxoichiwadtmfntg.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_J_DMSRvrGPf477Zy8gAbqw_hKDLopMV';
-
 let supabaseClient = null, currentUser = null, dbMode = 'guest', charts = {};
 let currentSection = 'dashboard';
 const sectionOrder = ['dashboard','daily','bike','emi','todo','settings'];
 let deferredPrompt = null;
 
 function isSupabaseConfigured() {
-    return SUPABASE_URL && !SUPABASE_URL.includes('YOUR-PROJECT') && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR-ANON') && SUPABASE_ANON_KEY.startsWith('sb_');
+    return SUPABASE_URL && !SUPABASE_URL.includes('YOUR-PROJECT') && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR-ANON') && SUPABASE_ANON_KEY.startsWith('eyJ');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 App starting...');
+    console.log(' App starting...');
     setDefaultDates(); updateDateDisplay(); loadTheme(); setupSwipe(); setupExitConfirm(); registerServiceWorker(); setupPWAInstall();
 
     const safetyTimeout = setTimeout(() => {
@@ -348,18 +377,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             await checkExistingSession();
         } else {
-            console.log('⚡ Supabase not ready or invalid key, using Guest mode');
+            console.log(' Supabase not ready or invalid key, using Guest mode');
             forceGuestMode();
         }
-    } catch (e) {
-        console.error('❌ Init error:', e);
-        forceGuestMode();
-    }
+    } catch (e) { console.error('❌ Init error:', e); forceGuestMode(); }
     clearTimeout(safetyTimeout);
 });
 
 function forceGuestMode() {
-    console.log('👤 Forcing Guest mode');
+    console.log(' Forcing Guest mode');
     const overlay = document.getElementById('authOverlay');
     if (overlay) overlay.style.display = 'none';
     dbMode = 'guest'; currentUser = null; updateSettingsUI(); refreshAllData();
@@ -453,7 +479,7 @@ function updateSettingsUI() {
     if (currentUser) {
         avatar.textContent = (currentUser.email?.[0] || 'U').toUpperCase(); name.textContent = currentUser.email?.split('@')[0] || 'User';
         email.textContent = currentUser.email || ''; status.className = 'status-badge online'; status.innerHTML = '☁️ Synced';
-        authBtns.innerHTML = '<button class="btn btn-danger" onclick="handleLogout()">🚪 Logout</button>';
+        authBtns.innerHTML = '<button class="btn btn-danger" onclick="handleLogout()"> Logout</button>';
     } else {
         avatar.textContent = 'G'; name.textContent = 'Guest User'; email.textContent = 'Data stored locally only';
         status.className = 'status-badge offline'; status.innerHTML = '⚡ Guest';
@@ -465,8 +491,24 @@ function getLocal(key) { try { return JSON.parse(localStorage.getItem(key)) || [
 function setLocal(key, data) { try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) { console.error('Storage error:', e); showToast('Storage full or blocked', 'error'); } }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
+// Toggle Card Name Input Visibility
+function toggleCardInput(prefix) {
+    const method = document.getElementById(prefix + 'PaymentMethod').value;
+    const cardGroup = document.getElementById(prefix + 'CardGroup');
+    if (cardGroup) cardGroup.style.display = method === 'card' ? 'flex' : 'none';
+}
+
 async function getExpenses() { if (dbMode==='cloud' && supabaseClient && currentUser) { try { const {data} = await supabaseClient.from('expenses').select('*').eq('user_id',currentUser.id).order('date',{ascending:false}); return data||[]; } catch(e) { return []; } } return getLocal('guest_expenses'); }
-async function saveExpense(obj) { if (dbMode==='cloud' && supabaseClient && currentUser) { obj.user_id=currentUser.id; obj.created_at=new Date().toISOString(); await supabaseClient.from('expenses').insert(obj); } else { const l=getLocal('guest_expenses'); obj.id=uid(); obj.created_at=new Date().toISOString(); l.unshift(obj); setLocal('guest_expenses',l); } }
+async function saveExpense(obj) { 
+    if (dbMode==='cloud' && supabaseClient && currentUser) { 
+        obj.user_id=currentUser.id; obj.created_at=new Date().toISOString(); 
+        // Remove card_name if not card to keep DB clean
+        if(obj.payment_method !== 'card') delete obj.card_name;
+        await supabaseClient.from('expenses').insert(obj); 
+    } else { 
+        const l=getLocal('guest_expenses'); obj.id=uid(); obj.created_at=new Date().toISOString(); l.unshift(obj); setLocal('guest_expenses',l); 
+    } 
+}
 async function deleteExpense(id) { if(!confirm('Delete?')) return; if(dbMode==='cloud'&&supabaseClient&&currentUser) await supabaseClient.from('expenses').delete().eq('id',id).eq('user_id',currentUser.id); else setLocal('guest_expenses',getLocal('guest_expenses').filter(e=>e.id!==id)); refreshAllData(); showToast('Deleted'); }
 async function getBike() { if(dbMode==='cloud'&&supabaseClient&&currentUser) { try { const {data}=await supabaseClient.from('bike_records').select('*').eq('user_id',currentUser.id).order('date',{ascending:false}); return data||[]; } catch(e) { return []; } } return getLocal('guest_bike_records'); }
 async function saveBike(obj) { if(dbMode==='cloud'&&supabaseClient&&currentUser) { obj.user_id=currentUser.id; obj.created_at=new Date().toISOString(); await supabaseClient.from('bike_records').insert(obj); } else { const l=getLocal('guest_bike_records'); obj.id=uid(); obj.created_at=new Date().toISOString(); l.unshift(obj); setLocal('guest_bike_records',l); } }
@@ -476,7 +518,6 @@ async function saveEmi(obj) { if(dbMode==='cloud'&&supabaseClient&&currentUser) 
 async function deleteEmi(id) { if(!confirm('Delete?')) return; if(dbMode==='cloud'&&supabaseClient&&currentUser) await supabaseClient.from('emi_plans').delete().eq('id',id).eq('user_id',currentUser.id); else setLocal('guest_emi_plans',getLocal('guest_emi_plans').filter(p=>p.id!==id)); refreshAllData(); showToast('Deleted'); }
 async function markEmiPaid(id) { const plans=await getEmis(); const p=plans.find(x=>x.id===id); if(!p||(p.paid_months||0)>=p.num_months){showToast('Fully paid','error');return;} const n=(p.paid_months||0)+1; if(dbMode==='cloud'&&supabaseClient&&currentUser) await supabaseClient.from('emi_plans').update({paid_months:n}).eq('id',id).eq('user_id',currentUser.id); else { const l=getLocal('guest_emi_plans'); const i=l.findIndex(x=>x.id===id); if(i>-1){l[i].paid_months=n;setLocal('guest_emi_plans',l);} } showToast('Paid!'); refreshAllData(); }
 
-// ================== TODOS (ROBUST ERROR HANDLING) ==================
 async function getTodos() {
     if(dbMode==='cloud' && supabaseClient && currentUser) {
         try { const {data,error} = await supabaseClient.from('todos').select('*').eq('user_id',currentUser.id).order('created_at',{ascending:false}); if(error) throw error; return data||[]; }
@@ -490,31 +531,12 @@ async function addTodo() {
     if (!input) { console.error('todoInput not found'); return; }
     const text = input.value.trim();
     if (!text) { showToast('Enter a task', 'error'); return; }
-    
     try {
-        console.log('➕ Adding todo:', text, 'Mode:', dbMode);
         const obj = { text, done: false, created_at: new Date().toISOString() };
-        
-        if (dbMode === 'cloud' && supabaseClient && currentUser) {
-            obj.user_id = currentUser.id;
-            const { error } = await supabaseClient.from('todos').insert(obj).select().single();
-            if (error) throw error;
-            console.log('✅ Todo saved to cloud');
-        } else {
-            const l = getLocal('guest_todos');
-            obj.id = uid();
-            l.unshift(obj);
-            setLocal('guest_todos', l);
-            console.log('✅ Todo saved to localStorage');
-        }
-        
-        input.value = '';
-        showToast('✅ Task added');
-        await refreshAllData();
-    } catch (e) {
-        console.error('❌ Error adding todo:', e);
-        showToast('Failed: ' + e.message, 'error');
-    }
+        if (dbMode === 'cloud' && supabaseClient && currentUser) { obj.user_id = currentUser.id; const { error } = await supabaseClient.from('todos').insert(obj).select().single(); if (error) throw error; }
+        else { const l = getLocal('guest_todos'); obj.id = uid(); l.unshift(obj); setLocal('guest_todos', l); }
+        input.value = ''; showToast('✅ Task added'); await refreshAllData();
+    } catch (e) { console.error('❌ Error adding todo:', e); showToast('Failed: ' + e.message, 'error'); }
 }
 
 async function addDashTodo() {
@@ -522,38 +544,17 @@ async function addDashTodo() {
     if (!input) { console.error('dashTodoInput not found'); return; }
     const text = input.value.trim();
     if (!text) { showToast('Enter a task', 'error'); return; }
-    
     try {
-        console.log('➕ Adding dashboard todo:', text, 'Mode:', dbMode);
         const obj = { text, done: false, created_at: new Date().toISOString() };
-        
-        if (dbMode === 'cloud' && supabaseClient && currentUser) {
-            obj.user_id = currentUser.id;
-            const { error } = await supabaseClient.from('todos').insert(obj).select().single();
-            if (error) throw error;
-            console.log('✅ Dashboard todo saved to cloud');
-        } else {
-            const l = getLocal('guest_todos');
-            obj.id = uid();
-            l.unshift(obj);
-            setLocal('guest_todos', l);
-            console.log('✅ Dashboard todo saved to localStorage');
-        }
-        
-        input.value = '';
-        showToast('✅ Task added');
-        await refreshAllData();
-    } catch (e) {
-        console.error('❌ Error adding dashboard todo:', e);
-        showToast('Failed: ' + e.message, 'error');
-    }
+        if (dbMode === 'cloud' && supabaseClient && currentUser) { obj.user_id = currentUser.id; const { error } = await supabaseClient.from('todos').insert(obj).select().single(); if (error) throw error; }
+        else { const l = getLocal('guest_todos'); obj.id = uid(); l.unshift(obj); setLocal('guest_todos', l); }
+        input.value = ''; showToast('✅ Task added'); await refreshAllData();
+    } catch (e) { console.error('❌ Error adding dashboard todo:', e); showToast('Failed: ' + e.message, 'error'); }
 }
 
 async function toggleTodo(id) {
     try {
-        const todos = await getTodos();
-        const t = todos.find(x => x.id === id);
-        if (!t) return;
+        const todos = await getTodos(); const t = todos.find(x => x.id === id); if (!t) return;
         document.querySelectorAll(`[data-todo-id="${id}"]`).forEach(el => el.classList.add('completing'));
         showToast('✅ Completed!');
         setTimeout(async () => {
@@ -573,10 +574,8 @@ async function deleteTodo(id) {
 
 async function renderTodos() {
     const todos = await getTodos();
-    const c = document.getElementById('todoListContainer');
-    const empty = document.getElementById('todoEmpty');
-    if (!c) return;
-    c.innerHTML = '';
+    const c = document.getElementById('todoListContainer'); const empty = document.getElementById('todoEmpty');
+    if (!c) return; c.innerHTML = '';
     if (!todos.length) { if (empty) empty.style.display = 'block'; renderDashTodos([]); return; }
     if (empty) empty.style.display = 'none';
     const sorted = [...todos].sort((a, b) => a.done - b.done);
@@ -590,17 +589,13 @@ async function renderTodos() {
 }
 
 function renderDashTodos(todos) {
-    const c = document.getElementById('dashTodoList');
-    const e = document.getElementById('dashTodoEmpty');
-    const v = document.getElementById('viewAllTasksBtn');
-    const tc = document.getElementById('taskCount');
-    if (!c) return;
-    c.innerHTML = '';
+    const c = document.getElementById('dashTodoList'); const e = document.getElementById('dashTodoEmpty');
+    const v = document.getElementById('viewAllTasksBtn'); const tc = document.getElementById('taskCount');
+    if (!c) return; c.innerHTML = '';
     const p = todos.filter(t => !t.done);
     if (tc) tc.textContent = p.length > 0 ? p.length + ' pending' : '';
     if (!p.length) { if (e) e.style.display = 'block'; if (v) v.style.display = todos.length > 0 ? 'block' : 'none'; return; }
-    if (e) e.style.display = 'none';
-    if (v) v.style.display = p.length > 3 ? 'block' : 'none';
+    if (e) e.style.display = 'none'; if (v) v.style.display = p.length > 3 ? 'block' : 'none';
     p.slice(0, 3).forEach(t => {
         const d = document.createElement('div'); d.className = 'dash-todo-item'; d.setAttribute('data-todo-id', t.id);
         d.innerHTML = `<div class="dash-todo-check" onclick="toggleTodo('${t.id}')">✓</div><div class="dash-todo-text">${escapeHtml(t.text)}</div><button class="dash-todo-del" onclick="deleteTodo('${t.id}')">🗑️</button>`;
@@ -610,14 +605,52 @@ function renderDashTodos(todos) {
 
 function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
-async function addQuickExpense() { const a=parseFloat(document.getElementById('quickAmount').value); const c=document.getElementById('quickCategory').value; const d=document.getElementById('quickDesc').value.trim(); const dt=new Date().toISOString().split('T')[0]; if(!a||a<=0){showToast('Enter valid amount','error');return;} await saveExpense({date:dt,category:c,amount:a,description:d}); showToast('Added!'); document.getElementById('quickAmount').value=''; document.getElementById('quickDesc').value=''; refreshAllData(); }
-async function addExpense() { const dt=document.getElementById('expDate').value; const c=document.getElementById('expCategory').value; const a=parseFloat(document.getElementById('expAmount').value); const d=document.getElementById('expDesc').value.trim(); if(!dt||!a||a<=0){showToast('Enter date & amount','error');return;} await saveExpense({date:dt,category:c,amount:a,description:d}); showToast('Saved'); document.getElementById('expAmount').value=''; document.getElementById('expDesc').value=''; refreshAllData(); }
-async function renderExpenses() { const f=document.getElementById('expFilter')?.value||'all'; const s=(document.getElementById('expSearch')?.value||'').toLowerCase(); let list=await getExpenses(); const today=new Date().toISOString().split('T')[0]; if(f==='month') list=list.filter(e=>e.date&&e.date.startsWith(today.slice(0,7))); if(s) list=list.filter(e=>(e.description||'').toLowerCase().includes(s)||(e.category||'').includes(s)); const tb=document.getElementById('expenseTableBody'); if(!tb) return; tb.innerHTML=''; if(!list.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light);">No data</td></tr>';return;} const lb={market:'🛒',shopping:'🛍️',bike_maintenance:'🔧',fuel:'⛽',emi:'💳',other:'📦'}; list.slice(0,20).forEach(e=>{ tb.innerHTML+=`<tr><td>${(e.date||'').slice(5)}</td><td><span class="badge badge-${e.category||'other'}">${lb[e.category]||'📦'}</span></td><td style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.description||'—'}</td><td style="font-weight:600;">৳${parseFloat(e.amount||0).toFixed(0)}</td><td><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')" style="padding:4px 8px;">🗑️</button></td></tr>`; }); }
+async function addQuickExpense() { 
+    const a=parseFloat(document.getElementById('quickAmount').value); const c=document.getElementById('quickCategory').value;
+    const d=document.getElementById('quickDesc').value.trim(); const dt=new Date().toISOString().split('T')[0];
+    const pm = document.getElementById('quickPaymentMethod').value;
+    const cn = pm === 'card' ? document.getElementById('quickCardName').value.trim() : '';
+    if(!a||a<=0){showToast('Enter valid amount','error');return;}
+    await saveExpense({date:dt,category:c,amount:a,description:d, payment_method: pm, card_name: cn});
+    showToast('Added!'); document.getElementById('quickAmount').value=''; document.getElementById('quickDesc').value=''; 
+    document.getElementById('quickCardName').value=''; document.getElementById('quickPaymentMethod').value='cash'; toggleCardInput('quick');
+    refreshAllData(); 
+}
+
+async function addExpense() { 
+    const dt=document.getElementById('expDate').value; const c=document.getElementById('expCategory').value;
+    const a=parseFloat(document.getElementById('expAmount').value); const d=document.getElementById('expDesc').value.trim();
+    const pm = document.getElementById('expPaymentMethod').value;
+    const cn = pm === 'card' ? document.getElementById('expCardName').value.trim() : '';
+    if(!dt||!a||a<=0){showToast('Enter date & amount','error');return;}
+    await saveExpense({date:dt,category:c,amount:a,description:d, payment_method: pm, card_name: cn});
+    showToast('Saved'); document.getElementById('expAmount').value=''; document.getElementById('expDesc').value=''; 
+    document.getElementById('expCardName').value=''; document.getElementById('expPaymentMethod').value='cash'; toggleCardInput('exp');
+    refreshAllData(); 
+}
+
+async function renderExpenses() { 
+    const f=document.getElementById('expFilter')?.value||'all'; const s=(document.getElementById('expSearch')?.value||'').toLowerCase(); 
+    let list=await getExpenses(); const today=new Date().toISOString().split('T')[0]; 
+    if(f==='month') list=list.filter(e=>e.date&&e.date.startsWith(today.slice(0,7))); 
+    if(s) list=list.filter(e=>(e.description||'').toLowerCase().includes(s)||(e.category||'').includes(s)); 
+    const tb=document.getElementById('expenseTableBody'); if(!tb) return; tb.innerHTML=''; 
+    if(!list.length){tb.innerHTML='<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-light);">No data</td></tr>';return;} 
+    const lb={market:'🛒',shopping:'🛍️',bike_maintenance:'🔧',fuel:'⛽',emi:'💳',other:''}; 
+    const payIcons = {cash: '💵 Cash', bkash: '📱 bKash', card: ' Card'};
+    list.slice(0,20).forEach(e=>{ 
+        let payHtml = `<span class="pay-badge pay-${e.payment_method || 'cash'}">${payIcons[e.payment_method] || '💵 Cash'}</span>`;
+        if(e.payment_method === 'card' && e.card_name) payHtml += `<br><small style="color:var(--text-light);font-size:9px;">${escapeHtml(e.card_name)}</small>`;
+        
+        tb.innerHTML+=`<tr><td>${(e.date||'').slice(5)}</td><td><span class="badge badge-${e.category||'other'}">${lb[e.category]||'📦'}</span><br>${payHtml}<br><small style="color:var(--text-light)">${e.description||''}</small></td><td style="font-weight:600;">৳${parseFloat(e.amount||0).toFixed(0)}</td><td><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')" style="padding:4px 8px;">🗑️</button></td></tr>`; 
+    }); 
+}
+
 async function addBikeRecord() { const dt=document.getElementById('bikeDate').value; const tp=document.getElementById('bikeType').value; const odo=parseFloat(document.getElementById('bikeOdometer').value)||0; const amt=parseFloat(document.getElementById('bikeAmount').value)||0; const fq=parseFloat(document.getElementById('bikeFuelQty').value)||0; const n=document.getElementById('bikeNotes').value.trim(); if(!dt||odo<=0){showToast('Enter date & odometer','error');return;} let mileage=null; if(tp==='fuel'&&fq>0){const all=await getBike();const prev=all.filter(r=>r.type==='fuel'&&r.odometer<odo).sort((a,b)=>b.odometer-a.odometer)[0];if(prev){const d=odo-prev.odometer;if(d>0)mileage=+(d/fq).toFixed(2);}} await saveBike({date:dt,type:tp,odometer:odo,amount:amt,fuel_qty:fq,mileage,notes:n}); showToast('Saved'); ['bikeAmount','bikeFuelQty','bikeNotes','bikeOdometer'].forEach(id=>document.getElementById(id).value=''); refreshAllData(); }
 async function renderBikeRecords() { const recs=await getBike(); const tb=document.getElementById('bikeTableBody'); if(!tb) return; tb.innerHTML=''; if(!recs.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-light);">No records</td></tr>';return;} recs.slice(0,15).forEach(r=>{ tb.innerHTML+=`<tr><td>${(r.date||'').slice(5)}</td><td><span class="badge badge-${r.type}">${r.type}</span></td><td>${r.odometer||'—'}</td><td style="font-weight:600;">৳${parseFloat(r.amount||0).toFixed(0)}</td><td>${r.mileage?r.mileage+' km/L':'—'}</td><td><button class="btn btn-sm btn-danger" onclick="deleteBike('${r.id}')" style="padding:4px 8px;">🗑️</button></td></tr>`; }); }
-async function renderBikeStats() { const recs=await getBike(); const c=document.getElementById('bikeStats'); if(!c) return; const fuel=recs.filter(r=>r.type==='fuel'); const maint=recs.filter(r=>r.type==='maintenance'); const tf=fuel.reduce((s,r)=>s+parseFloat(r.amount||0),0); const tm=maint.reduce((s,r)=>s+parseFloat(r.amount||0),0); const tq=fuel.reduce((s,r)=>s+parseFloat(r.fuel_qty||0),0); const wm=fuel.filter(r=>r.mileage); const am=wm.length?(wm.reduce((s,r)=>s+r.mileage,0)/wm.length):0; c.innerHTML=`<div class="stat-card"><div class="icon-bg">⛽</div><div class="label">Fuel Cost</div><div class="value">৳${tf.toFixed(0)}</div><div class="sub">${fuel.length} refuels</div></div><div class="stat-card warning"><div class="icon-bg">🔧</div><div class="label">Maint.</div><div class="value">৳${tm.toFixed(0)}</div><div class="sub">${maint.length} services</div></div><div class="stat-card info"><div class="icon-bg">📏</div><div class="label">Mileage</div><div class="value">${am.toFixed(1)}</div><div class="sub">km/L</div></div><div class="stat-card danger"><div class="icon-bg">💧</div><div class="label">Fuel Used</div><div class="value">${tq.toFixed(1)}L</div><div class="sub">total</div></div>`; }
+async function renderBikeStats() { const recs=await getBike(); const c=document.getElementById('bikeStats'); if(!c) return; const fuel=recs.filter(r=>r.type==='fuel'); const maint=recs.filter(r=>r.type==='maintenance'); const tf=fuel.reduce((s,r)=>s+parseFloat(r.amount||0),0); const tm=maint.reduce((s,r)=>s+parseFloat(r.amount||0),0); const tq=fuel.reduce((s,r)=>s+parseFloat(r.fuel_qty||0),0); const wm=fuel.filter(r=>r.mileage); const am=wm.length?(wm.reduce((s,r)=>s+r.mileage,0)/wm.length):0; c.innerHTML=`<div class="stat-card"><div class="icon-bg">⛽</div><div class="label">Fuel Cost</div><div class="value">৳${tf.toFixed(0)}</div><div class="sub">${fuel.length} refuels</div></div><div class="stat-card warning"><div class="icon-bg">🔧</div><div class="label">Maint.</div><div class="value">৳${tm.toFixed(0)}</div><div class="sub">${maint.length} services</div></div><div class="stat-card info"><div class="icon-bg">📏</div><div class="label">Mileage</div><div class="value">${am.toFixed(1)}</div><div class="sub">km/L</div></div><div class="stat-card danger"><div class="icon-bg"></div><div class="label">Fuel Used</div><div class="value">${tq.toFixed(1)}L</div><div class="sub">total</div></div>`; }
 async function addEmiPlan() { const n=document.getElementById('emiName').value.trim(); const t=parseFloat(document.getElementById('emiTotal').value)||0; const m=parseFloat(document.getElementById('emiMonthly').value)||0; const mo=parseInt(document.getElementById('emiMonths').value)||0; if(!n||t<=0||m<=0||mo<=0){showToast('Fill all fields','error');return;} await saveEmi({name:n,total_amount:t,monthly_payment:m,num_months:mo,paid_months:0}); showToast('Plan added'); ['emiName','emiTotal','emiMonthly','emiMonths'].forEach(id=>document.getElementById(id).value=''); refreshAllData(); }
-async function renderEmiPlans() { const plans=await getEmis(); const c=document.getElementById('emiPlansContainer'); if(!c) return; c.innerHTML=''; if(!plans.length){c.innerHTML='<p style="text-align:center;color:var(--text-light);padding:20px;">No plans</p>';return;} plans.forEach(p=>{ const pa=(p.paid_months||0)*p.monthly_payment; const pct=Math.min(100,(pa/p.total_amount)*100); c.innerHTML+=`<div class="card" style="margin-bottom:12px;padding:14px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><strong>${p.name}</strong><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-success" onclick="markEmiPaid('${p.id}')">✓ Pay</button><button class="btn btn-sm btn-danger" onclick="deleteEmi('${p.id}')">🗑️</button></div></div><div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">Total: ৳${Number(p.total_amount).toLocaleString()} | Monthly: ৳${Number(p.monthly_payment).toLocaleString()}</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pct>=100?'var(--success)':'var(--primary)'}"></div></div><div style="font-size:11px;color:var(--text-light);margin-top:4px;text-align:right;">${p.paid_months||0}/${p.num_months} (${pct.toFixed(0)}%)</div></div>`; }); }
+async function renderEmiPlans() { const plans=await getEmis(); const c=document.getElementById('emiPlansContainer'); if(!c) return; c.innerHTML=''; if(!plans.length){c.innerHTML='<p style="text-align:center;color:var(--text-light);padding:20px;">No plans</p>';return;} plans.forEach(p=>{ const pa=(p.paid_months||0)*p.monthly_payment; const pct=Math.min(100,(pa/p.total_amount)*100); c.innerHTML+=`<div class="card" style="margin-bottom:12px;padding:14px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><strong>${p.name}</strong><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-success" onclick="markEmiPaid('${p.id}')">✓ Pay</button><button class="btn btn-sm btn-danger" onclick="deleteEmi('${p.id}')">🗑️</button></div></div><div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">Total: ৳${Number(p.total_amount).toLocaleString()} | Monthly: ${Number(p.monthly_payment).toLocaleString()}</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pct>=100?'var(--success)':'var(--primary)'}"></div></div><div style="font-size:11px;color:var(--text-light);margin-top:4px;text-align:right;">${p.paid_months||0}/${p.num_months} (${pct.toFixed(0)}%)</div></div>`; }); }
 
 function getBudget(){return parseFloat(localStorage.getItem('monthly_budget')||'0')||0;}
 function saveBudget(){localStorage.setItem('monthly_budget',parseFloat(document.getElementById('budgetInput').value)||0);showToast('Budget saved');renderDashboard();}
@@ -629,20 +662,19 @@ async function renderDashboard() {
     const ml=exp.filter(e=>e.date&&e.date.startsWith(mp));
     const ta=exp.reduce((s,e)=>s+parseFloat(e.amount||0),0); const mt=ml.reduce((s,e)=>s+parseFloat(e.amount||0),0);
     const ds=document.getElementById('dashStats');
-    if(ds) ds.innerHTML=`<div class="stat-card"><div class="icon-bg">📅</div><div class="label">Today</div><div class="value">৳${tl.reduce((s,e)=>s+parseFloat(e.amount||0),0).toFixed(0)}</div><div class="sub">${tl.length} txns</div></div><div class="stat-card info"><div class="icon-bg">📆</div><div class="label">This Week</div><div class="value">৳${wl.reduce((s,e)=>s+parseFloat(e.amount||0),0).toFixed(0)}</div><div class="sub">${wl.length} txns</div></div><div class="stat-card warning"><div class="icon-bg">🗓️</div><div class="label">This Month</div><div class="value">৳${mt.toFixed(0)}</div><div class="sub">${ml.length} txns</div></div><div class="stat-card danger"><div class="icon-bg">📊</div><div class="label">All Time</div><div class="value">৳${ta.toFixed(0)}</div><div class="sub">${exp.length} txns</div></div>`;
+    if(ds) ds.innerHTML=`<div class="stat-card"><div class="icon-bg">📅</div><div class="label">Today</div><div class="value">${tl.reduce((s,e)=>s+parseFloat(e.amount||0),0).toFixed(0)}</div><div class="sub">${tl.length} txns</div></div><div class="stat-card info"><div class="icon-bg">📆</div><div class="label">This Week</div><div class="value">৳${wl.reduce((s,e)=>s+parseFloat(e.amount||0),0).toFixed(0)}</div><div class="sub">${wl.length} txns</div></div><div class="stat-card warning"><div class="icon-bg">🗓️</div><div class="label">This Month</div><div class="value">৳${mt.toFixed(0)}</div><div class="sub">${ml.length} txns</div></div><div class="stat-card danger"><div class="icon-bg">📊</div><div class="label">All Time</div><div class="value">৳${ta.toFixed(0)}</div><div class="sub">${exp.length} txns</div></div>`;
     const budget=getBudget(); const bi=document.getElementById('budgetInput'); if(bi) bi.value=budget||'';
     const bEl=document.getElementById('budgetProgress');
     if(bEl) { if(budget>0){ const u=Math.min(100,(mt/budget)*100); const col=u>90?'var(--danger)':u>70?'var(--warning)':'var(--primary)'; bEl.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:4px;"><span>৳${mt.toFixed(0)} spent</span><span>৳${Math.max(0,budget-mt).toFixed(0)} left</span></div><div class="progress-bar"><div class="progress-fill" style="width:${u}%;background:${col}"></div></div>`; } else { bEl.innerHTML='<p style="color:var(--text-light);font-size:12px;text-align:center;padding:8px;">Set a budget above</p>'; } }
     renderDashChart(exp);
-    const todos = await getTodos();
-    renderDashTodos(todos);
+    const todos = await getTodos(); renderDashTodos(todos);
 }
 
 function renderDashChart(expenses) { const canvas=document.getElementById('dashChart'); if(!canvas) return; if(charts.dash) charts.dash.destroy(); const now=new Date(); const labels=[]; const totals=new Array(6).fill(0); for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);labels.push(d.toLocaleString('en-US',{month:'short'}));} expenses.forEach(e=>{if(!e.date)return;const d=new Date(e.date);const diff=(now.getFullYear()-d.getFullYear())*12+(now.getMonth()-d.getMonth());if(diff>=0&&diff<6)totals[5-diff]+=parseFloat(e.amount||0);}); charts.dash=new Chart(canvas.getContext('2d'),{type:'bar',data:{labels,datasets:[{data:totals,backgroundColor:'#0d9488',borderRadius:6,maxBarThickness:30}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false}}}}}); }
 async function renderReportChart() { const canvas=document.getElementById('reportChart'); if(!canvas) return; if(charts.report) charts.report.destroy(); const expenses=await getExpenses(); const ms=document.getElementById('reportMonth')?.value||new Date().toISOString().slice(0,7); const f=expenses.filter(e=>e.date&&e.date.startsWith(ms)); const cats={market:0,shopping:0,bike_maintenance:0,fuel:0,emi:0,other:0}; f.forEach(e=>{if(cats[e.category]!==undefined)cats[e.category]+=parseFloat(e.amount||0);}); charts.report=new Chart(canvas.getContext('2d'),{type:'doughnut',data:{labels:['Market','Shopping','Bike','Fuel','EMI','Other'],datasets:[{data:Object.values(cats),backgroundColor:['#0ea5e9','#ec4899','#f59e0b','#ef4444','#8b5cf6','#64748b'],borderWidth:0,hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{padding:12,usePointStyle:true,font:{size:11}}}}}}); }
 
-async function downloadMonthlyPDF() { const ms=document.getElementById('reportMonth')?.value; if(!ms){showToast('Select month','error');return;} const f=(await getExpenses()).filter(e=>e.date&&e.date.startsWith(ms)); if(!f.length){showToast('No data','error');return;} const {jsPDF}=window.jspdf; const doc=new jsPDF(); doc.setFontSize(16); doc.text('Monthly Report',105,15,{align:'center'}); doc.setFontSize(10); doc.text(`Month: ${ms}`,105,22,{align:'center'}); doc.text(`Total: ৳${f.reduce((s,e)=>s+parseFloat(e.amount||0),0).toFixed(2)}`,14,35); doc.autoTable({startY:40,head:[['Date','Category','Description','Amount']],body:f.map(e=>[e.date,e.category,e.description||'—',`৳${parseFloat(e.amount).toFixed(2)}`]),theme:'striped',headStyles:{fillColor:[13,148,136]},styles:{fontSize:9}}); doc.save(`report-${ms}.pdf`); showToast('PDF downloaded'); }
-async function downloadCSV() { const ms=document.getElementById('reportMonth')?.value; if(!ms){showToast('Select month','error');return;} const f=(await getExpenses()).filter(e=>e.date&&e.date.startsWith(ms)); if(!f.length){showToast('No data','error');return;} let csv='Date,Category,Description,Amount\n'; f.forEach(e=>{csv+=`${e.date},${e.category},"${(e.description||'').replace(/"/g,'""')}",${e.amount}\n`;}); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=`expenses-${ms}.csv`; a.click(); showToast('CSV exported'); }
+async function downloadMonthlyPDF() { const ms=document.getElementById('reportMonth')?.value; if(!ms){showToast('Select month','error');return;} const f=(await getExpenses()).filter(e=>e.date&&e.date.startsWith(ms)); if(!f.length){showToast('No data','error');return;} const {jsPDF}=window.jspdf; const doc=new jsPDF(); doc.setFontSize(16); doc.text('Monthly Report',105,15,{align:'center'}); doc.setFontSize(10); doc.text(`Month: ${ms}`,105,22,{align:'center'}); doc.text(`Total: ৳${f.reduce((s,e)=>s+parseFloat(e.amount||0),0).toFixed(2)}`,14,35); doc.autoTable({startY:40,head:[['Date','Category','Payment','Amount']],body:f.map(e=>[e.date,e.category,(e.payment_method==='card' && e.card_name)?`${e.payment_method} (${e.card_name})`:e.payment_method,`৳${parseFloat(e.amount).toFixed(2)}`]),theme:'striped',headStyles:{fillColor:[13,148,136]},styles:{fontSize:9}}); doc.save(`report-${ms}.pdf`); showToast('PDF downloaded'); }
+async function downloadCSV() { const ms=document.getElementById('reportMonth')?.value; if(!ms){showToast('Select month','error');return;} const f=(await getExpenses()).filter(e=>e.date&&e.date.startsWith(ms)); if(!f.length){showToast('No data','error');return;} let csv='Date,Category,Payment Method,Card Name,Description,Amount\n'; f.forEach(e=>{csv+=`${e.date},${e.category},${e.payment_method||'cash'},"${(e.card_name||'').replace(/"/g,'""')}","${(e.description||'').replace(/"/g,'""')}",${e.amount}\n`;}); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=`expenses-${ms}.csv`; a.click(); showToast('CSV exported'); }
 
 function exportAllData() { const data={expenses:getLocal('guest_expenses'),bike_records:getLocal('guest_bike_records'),emi_plans:getLocal('guest_emi_plans'),todos:getLocal('guest_todos'),budget:localStorage.getItem('monthly_budget'),exportDate:new Date().toISOString()}; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})); a.download=`backup-${new Date().toISOString().split('T')[0]}.json`; a.click(); showToast('Backup downloaded'); }
 function importAllData(event) { const file=event.target.files[0]; if(!file) return; const reader=new FileReader(); reader.onload=function(e){ try { const d=JSON.parse(e.target.result); if(d.expenses)setLocal('guest_expenses',d.expenses); if(d.bike_records)setLocal('guest_bike_records',d.bike_records); if(d.emi_plans)setLocal('guest_emi_plans',d.emi_plans); if(d.todos)setLocal('guest_todos',d.todos); if(d.budget)localStorage.setItem('monthly_budget',d.budget); showToast('Imported!'); refreshAllData(); } catch(err){ showToast('Invalid file','error'); } }; reader.readAsText(file); event.target.value=''; }
