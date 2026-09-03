@@ -321,7 +321,7 @@
 </nav>
 <script>
 // ================== CONFIG ==================
-const SUPABASE_URL = 'https://vfhjbxoichiwadtmfntg.supabase.co;
+const SUPABASE_URL = 'https://vfhjbxoichiwadtmfntg.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_J_DMSRvrGPf477Zy8gAbqw_hKDLopMV';
 
 let supabaseClient = null, currentUser = null, dbMode = 'guest', charts = {};
@@ -330,7 +330,7 @@ const sectionOrder = ['dashboard','daily','bike','emi','todo','settings'];
 let deferredPrompt = null;
 
 function isSupabaseConfigured() {
-    return SUPABASE_URL && !SUPABASE_URL.includes('YOUR-PROJECT') && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR-ANON') && SUPABASE_ANON_KEY.startsWith('eyJ');
+    return SUPABASE_URL && !SUPABASE_URL.includes('YOUR-PROJECT') && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR-ANON') && SUPABASE_ANON_KEY.startsWith('sb_');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
