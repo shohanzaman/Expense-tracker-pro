@@ -1,26 +1,59 @@
 {
-  "name": "Aviary Pro",
-  "short_name": "Aviary Pro",
-  "description": "Aviary management, breeding, feeding, health, finance and bird records.",
-  "start_url": "./",
-  "scope": "./",
+  "name": "Expense Tracker Pro",
+  "short_name": "Expenses",
+  "description": "Track your daily expenses, bike costs, EMI and To-Dos",
+  "start_url": "./index.html",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#f7f6f0",
-  "theme_color": "#5f7f72",
+  "orientation": "portrait",
+  "background_color": "#f8fafc",
+  "theme_color": "#0d9488",
   "lang": "en",
+  "categories": ["finance", "productivity"],
   "icons": [
     {
-      "src": "./icon-192.png",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%230d9488'/><text x='96' y='130' font-size='110' text-anchor='middle' fill='white'>💰</text></svg>",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
-      "src": "./icon-512.png",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%230d9488'/><text x='256' y='340' font-size='280' text-anchor='middle' fill='white'>💰</text></svg>",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%230d9488'/><text x='256' y='340' font-size='280' text-anchor='middle' fill='white'>💰</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Quick Add Expense",
+      "short_name": "Add Expense",
+      "description": "Add a new expense quickly",
+      "url": "./index.html#quick-add",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%2310b981'/><text x='96' y='130' font-size='110' text-anchor='middle' fill='white'>💸</text></svg>",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "View Tasks",
+      "short_name": "Tasks",
+      "description": "View your to-do tasks",
+      "url": "./index.html#todo",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%233b82f6'/><text x='96' y='130' font-size='110' text-anchor='middle' fill='white'>✅</text></svg>",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
